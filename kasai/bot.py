@@ -28,16 +28,19 @@
 
 from __future__ import annotations
 
-__all__ = ("KasaiApp",)
+__all__ = ("GatewayApp", "LightbulbApp", "CrescentApp")
 
 import typing as t
 
 import hikari
+from pkg_resources import working_set
 
 import kasai
 
+_libs = [p.key for p in working_set]
 
-class KasaiApp(hikari.GatewayBot):
+
+class GatewayApp(hikari.GatewayBot):
     def __init__(
         self,
         token: str,
@@ -57,3 +60,33 @@ class KasaiApp(hikari.GatewayBot):
         if self._irc.is_alive:
             await self._irc.close()
         return await super()._close()
+
+    @staticmethod
+    def print_banner(
+        banner: t.Optional[str],
+        allow_color: bool,
+        force_color: bool,
+        extra_args: t.Optional[t.Dict[str, str]] = None,
+    ) -> None:
+        super(GatewayApp, GatewayApp).print_banner(
+            banner, allow_color, force_color, extra_args
+        )
+        print(
+            f"Thanks for using "
+            f"\33[1m\33[38;5;1m火\33[38;5;208m災 \33[38;5;3mkasai\33[0m "
+            f"(v\33[1m{kasai.__version__}\33[0m)!\n"
+        )
+
+
+if "hikari-lightbulb" in _libs:
+    import lightbulb
+
+    class LightbulbApp(GatewayApp, lightbulb.BotApp):
+        ...
+
+
+if "hikari-crescent" in _libs:
+    import crescent
+
+    class CrescentApp(GatewayApp, crescent.Bot):
+        ...

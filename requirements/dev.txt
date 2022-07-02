@@ -18,7 +18,10 @@ isort~=5.10.0
 
 # Typing
 mypy==0.961
+hikari-lightbulb
+hikari-crescent
 types-attrs
+types-setuptools
 
 # Line lengths
 len8~=0.7.2

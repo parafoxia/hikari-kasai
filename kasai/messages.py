@@ -31,15 +31,15 @@ from __future__ import annotations
 __all__ = ("Message",)
 
 import re
-from dataclasses import dataclass
 
+import attr
+
+# https://datatracker.ietf.org/doc/html/rfc2812.html#section-2.3
 _PATTERN = re.compile(r":([^!]*)!([^@]*)@([^ ]*) ([^ ]*) ([^ ]*) :(.*)")
 
 
-@dataclass(frozen=True)
+@attr.define(hash=True, weakref_slot=False)
 class Message:
-    # https://datatracker.ietf.org/doc/html/rfc2812.html#section-2.3
-
     nickname: str
     user: str
     host: str

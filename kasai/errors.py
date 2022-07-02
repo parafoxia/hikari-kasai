@@ -26,22 +26,16 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import annotations
+__all__ = ("KasaiError", "NotConnected", "AlreadyConnected")
 
-__productname__ = "hikari-kasai"
-__version__ = "0.1.0"
-__description__ = "A bridge allowing for Twitch interactions within Discord bots."
-__url__ = "https://github.com/parafoxia/hikari-kasai"
-__docs__ = "https://hikari-kasai.readthedocs.io"
-__author__ = "Ethan Henderson"
-__author_email__ = "ethan.henderson.1998@gmail.com"
-__license__ = "BSD 3-Clause 'New' or 'Revised' License"
-__bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
-__ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
-__changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
 
-from kasai.api import *
-from kasai.bot import *
-from kasai.errors import *
-from kasai.events import *
-from kasai.messages import *
+class KasaiError(Exception):
+    ...
+
+
+class NotConnected(KasaiError):
+    ...
+
+
+class AlreadyConnected(KasaiError):
+    ...

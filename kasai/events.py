@@ -28,20 +28,39 @@
 
 from __future__ import annotations
 
-__productname__ = "hikari-kasai"
-__version__ = "0.1.0"
-__description__ = "A bridge allowing for Twitch interactions within Discord bots."
-__url__ = "https://github.com/parafoxia/hikari-kasai"
-__docs__ = "https://hikari-kasai.readthedocs.io"
-__author__ = "Ethan Henderson"
-__author_email__ = "ethan.henderson.1998@gmail.com"
-__license__ = "BSD 3-Clause 'New' or 'Revised' License"
-__bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
-__ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
-__changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
+__all__ = ("KasaiEvent", "IrcMessageCreateEvent")
 
-from kasai.api import *
-from kasai.bot import *
-from kasai.errors import *
-from kasai.events import *
-from kasai.messages import *
+import typing as t
+
+import attr
+from hikari import Event
+from hikari.internal import attr_extensions
+
+if t.TYPE_CHECKING:
+    from hikari import traits
+
+    from kasai.messages import Message
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class KasaiEvent(Event):
+    app: traits.RESTAware = attr.field(metadata={attr_extensions.SKIP_DEEP_COPY: True})
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class IrcMessageCreateEvent(KasaiEvent):
+    message: Message
+
+    @property
+    def user(self) -> str:
+        return self.message.user
+
+    @property
+    def channel(self) -> str:
+        return self.message.channel
+
+    @property
+    def content(self) -> str:
+        return self.message.content

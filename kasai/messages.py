@@ -28,20 +28,35 @@
 
 from __future__ import annotations
 
-__productname__ = "hikari-kasai"
-__version__ = "0.1.0"
-__description__ = "A bridge allowing for Twitch interactions within Discord bots."
-__url__ = "https://github.com/parafoxia/hikari-kasai"
-__docs__ = "https://hikari-kasai.readthedocs.io"
-__author__ = "Ethan Henderson"
-__author_email__ = "ethan.henderson.1998@gmail.com"
-__license__ = "BSD 3-Clause 'New' or 'Revised' License"
-__bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
-__ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
-__changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
+__all__ = ("Message",)
 
-from kasai.api import *
-from kasai.bot import *
-from kasai.errors import *
-from kasai.events import *
-from kasai.messages import *
+import re
+from dataclasses import dataclass
+
+_PATTERN = re.compile(r":([^!]*)!([^@]*)@([^ ]*) ([^ ]*) ([^ ]*) :(.*)")
+
+
+@dataclass(frozen=True)
+class Message:
+    # https://datatracker.ietf.org/doc/html/rfc2812.html#section-2.3
+
+    nickname: str
+    user: str
+    host: str
+    type: str
+    channel: str
+    content: str
+
+    @classmethod
+    def parse(cls, message: str) -> Message:
+        if match := _PATTERN.match(message):
+            return cls(*match.groups())
+        else:
+            return cls(*(["unknown"] * 6))
+
+    @property
+    def as_formatted(self) -> str:
+        return (
+            f":{self.nickname}!{self.user}@{self.host} "
+            f"{self.type} {self.channel} :{self.content}\r\n"
+        )

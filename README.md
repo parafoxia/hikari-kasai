@@ -1,6 +1,6 @@
 # hikari-kasai
 
-A bridge allowing for Twitch interactions within Discord bots.
+A bridge between Discord and Twitch chat.
 
 ## Installation
 

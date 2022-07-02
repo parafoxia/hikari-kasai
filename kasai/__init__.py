@@ -30,7 +30,7 @@ from __future__ import annotations
 
 __productname__ = "hikari-kasai"
 __version__ = "0.1.0"
-__description__ = "A bridge allowing for Twitch interactions within Discord bots."
+__description__ = "A bridge between Discord and Twitch chat."
 __url__ = "https://github.com/parafoxia/hikari-kasai"
 __docs__ = "https://hikari-kasai.readthedocs.io"
 __author__ = "Ethan Henderson"

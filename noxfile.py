@@ -109,7 +109,7 @@ def imports(session: nox.Session) -> None:
 
 @nox.session(reuse_venv=True)
 def typing(session: nox.Session) -> None:
-    session.install(*fetch_installs("Typing"))
+    session.install(*fetch_installs("Typing"), "-r", "requirements/base.txt")
     session.run("mypy", CHECK_PATHS[0], CHECK_PATHS[3])
 
 

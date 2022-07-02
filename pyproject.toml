@@ -1,0 +1,33 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+exclude = "tests"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.len8]
+exclude = ["tests", "kasai/ux.py"]
+code-length = 88
+
+[tool.coverage.report]
+omit = ["kasai/__init__.py", "kasai/ux.py"]
+exclude_lines = [
+    "if t.TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "return NotImplemented",
+    "except KeyboardInterrupt as exc",
+]

@@ -20,6 +20,33 @@ You may need to prefix these commands with a call to the Python interpreter depe
 
 All methods relating to Twitch can be accessed through `bot.irc`.
 
+*hikari-kasai* officially supports Hikari, as well as the Lightbulb and Crescent command handlers:
+
+```py
+kasai.GatewayApp(...)
+kasai.LightbulbApp(...)
+kasai.CrescentApp(...)
+```
+
+However, you can use *hikari-kasai*, with any command handler you like, so long as it doesn't conflict.
+To do this, you can create a subclassed bot:
+
+```py
+import kasai
+import lightbulb
+
+
+class Bot(kasai.GatewayApp, lightbulb.BotApp):
+    ...
+
+
+bot = Bot(...)
+```
+
+Providing you inherit from `GatewayApp` first, you do not need to provide an `__init__`.
+
+A full working implementation could look something like this:
+
 ```py
 import hikari
 import kasai

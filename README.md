@@ -24,12 +24,13 @@ All methods relating to Twitch can be accessed through `bot.irc`.
 import hikari
 import kasai
 
-bot = kasai.KasaiApp(
+# This can also be LightbulbApp or CrescentApp.
+bot = kasai.GatewayApp(
     discord_token,
     irc_token,
     channel,
     nickname,
-    **[kwargs for GatewayBot],
+    **[kwargs for superclass],
 )
 
 

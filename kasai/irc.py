@@ -34,21 +34,17 @@ import asyncio
 import logging
 import socket
 
-from hikari import GatewayBot
-
 import kasai
-
-_HOST = "irc.chat.twitch.tv"
-_PORT = 6667
+from kasai import ux
 
 _log = logging.getLogger(__name__)
 
 
 class IrcClient:
-    __slots__ = ("bot", "_token", "channel", "nickname", "_listen", "_sock", "_task")
+    __slots__ = ("bot", "_token", "channel", "nickname", "_sock", "_task")
 
     def __init__(
-        self, bot: GatewayBot, token: str, channel: str, nickname: str
+        self, bot: kasai.GatewayApp, token: str, channel: str, nickname: str
     ) -> None:
         self.bot = bot
         self._token = token.strip()
@@ -57,75 +53,46 @@ class IrcClient:
 
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
-        self._listen = False
 
     @property
     def is_alive(self) -> bool:
         return self._sock is not None
 
-    def _create_new_sock(self) -> None:
+    def _create_sock(self) -> None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
-    async def start(self) -> None:
-        if self._sock is not None:
-            raise kasai.AlreadyConnected("there is already an active connection")
+    async def _listen(self, loop: asyncio.AbstractEventLoop) -> None:
+        assert self._sock
 
-        loop = asyncio.get_running_loop()
+        while True:
+            resp = await loop.sock_recv(self._sock, 512)
 
-        self._create_new_sock()
-        assert self._sock is not None
-        await loop.sock_connect(self._sock, (_HOST, _PORT))
-        await loop.sock_sendall(
-            self._sock,
-            (
-                f"PASS {self._token}\n"
-                f"NICK {self.nickname}\n"
-                f"JOIN {self.channel}\n"
-            ).encode("utf-8"),
-        )
+            if resp.startswith(b"PING"):
+                await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv")
+                _log.debug("PING received, sending PONG back")
 
-        self._listen = True
+            if b"JOIN" in resp:
+                _log.info(f"joined {self.channel}")
 
-        async def _do() -> None:
-            assert self._sock
+            if b"PRIVMSG" not in resp:
+                continue
 
-            while self._listen:
-                resp = await loop.sock_recv(self._sock, 512)
-
-                if resp.startswith(b"PING"):
-                    await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv")
-                    _log.debug("PING received, sending PONG back")
-
-                if b"JOIN" in resp:
-                    _log.info(f"successfully connected to {self.channel}")
-
-                if b"PRIVMSG" not in resp:
-                    continue
-
-                data = resp.decode("utf-8").strip()
-                _log.debug(f"received message: {data}")
-                self.bot.dispatch(
-                    kasai.IrcMessageCreateEvent(
-                        message=kasai.Message.parse(data), app=self.bot
-                    )
+            data = resp.decode("utf-8").strip()
+            _log.debug(f"received message: {data}")
+            self.bot.dispatch(
+                kasai.IrcMessageCreateEvent(
+                    message=kasai.Message.parse(data), app=self.bot
                 )
+            )
 
-        self._task = loop.create_task(_do())
+    @ux.deprecated("0.4a", "GatewayApp.start_irc")
+    async def start(self) -> None:
+        await self.bot.start_irc()
 
+    @ux.deprecated("0.4a", "GatewayApp.close_irc")
     async def close(self) -> None:
-        if self._sock is None:
-            raise kasai.NotConnected("no active connections to close")
-
-        if not self._task:
-            return
-
-        self._sock.close()
-        self._sock = None
-        if not self._task.cancelled():
-            self._task.cancel()
-        self._listen = False
-        _log.info(f"successfully closed connection to {self.channel}")
+        await self.bot.close_irc()
 
     async def create_message(self, content: str) -> kasai.Message:
         if self._sock is None:

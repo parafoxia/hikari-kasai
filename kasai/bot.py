@@ -28,8 +28,11 @@
 
 from __future__ import annotations
 
+import asyncio
+
 __all__ = ("GatewayApp", "LightbulbApp", "CrescentApp")
 
+import logging
 import typing as t
 
 import hikari
@@ -39,8 +42,12 @@ import kasai
 
 _libs = [p.key for p in working_set]
 
+_log = logging.getLogger(__name__)
+
 
 class GatewayApp(hikari.GatewayBot):
+    # __slots__ = ("_irc",)
+
     def __init__(
         self,
         token: str,
@@ -56,9 +63,43 @@ class GatewayApp(hikari.GatewayBot):
     def irc(self) -> kasai.IrcClient:
         return self._irc
 
+    async def start_irc(self) -> None:
+        if self._irc._sock is not None:
+            raise kasai.AlreadyConnected("there is already an active connection")
+
+        loop = asyncio.get_running_loop()
+
+        self._irc._create_sock()
+        assert self._irc._sock is not None
+        await loop.sock_connect(self._irc._sock, ("irc.chat.twitch.tv", 6667))
+        await loop.sock_sendall(
+            self._irc._sock,
+            (
+                f"PASS {self._irc._token}\n"
+                f"NICK {self._irc.nickname}\n"
+                f"JOIN {self._irc.channel}\n"
+            ).encode("utf-8"),
+        )
+
+        self._irc._task = loop.create_task(self._irc._listen(loop))
+        _log.info("successfully started IRC websocket")
+
+    async def close_irc(self) -> None:
+        if self._irc._sock is None:
+            raise kasai.NotConnected("no active connections to close")
+
+        if not self._irc._task:
+            return
+
+        self._irc._sock.close()
+        self._irc._sock = None
+        if not self._irc._task.cancelled():
+            self._irc._task.cancel()
+        _log.info("successfully closed IRC websocket")
+
     async def _close(self) -> None:
         if self._irc.is_alive:
-            await self._irc.close()
+            await self.close_irc()
         return await super()._close()
 
     @staticmethod

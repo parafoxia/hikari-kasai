@@ -64,10 +64,10 @@ bot = kasai.GatewayApp(
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def on_message(event):
     if event.content == "start":
-        await bot.irc.start()
+        await bot.start_irc()
 
     elif event.content == "close":
-        await bot.irc.close()
+        await bot.close_irc()
 
     elif event.content.startswith("send"):
         await bot.irc.create_message(event.content[5:])

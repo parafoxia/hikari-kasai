@@ -40,8 +40,8 @@ __bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
 __ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
 __changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
 
-from kasai.api import *
 from kasai.bot import *
 from kasai.errors import *
 from kasai.events import *
+from kasai.irc import *
 from kasai.messages import *

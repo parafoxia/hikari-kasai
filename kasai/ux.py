@@ -28,14 +28,17 @@
 
 from __future__ import annotations
 
+__all__ = ("BANNER", "display_splash", "deprecated")
+
 import logging
 import platform
-import warnings
+import typing as t
 from importlib.util import find_spec
 
 import kasai
 
 _log = logging.getLogger(__name__)
+_FuncT = t.Callable[..., t.Any]
 
 BANNER = r"""
        {r}    )
@@ -81,8 +84,15 @@ def display_splash() -> None:
     )
 
 
-def warn(message: str) -> None:
-    if _log.hasHandlers() and _log.getEffectiveLevel() <= 30:
-        _log.warning(message)
-    else:
-        warnings.warn(message)
+def deprecated(ver: str, alt: str | None = None) -> t.Callable[[_FuncT], _FuncT]:
+    def decorator(func: _FuncT) -> _FuncT:
+        def wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            msg = f"'{func.__qualname__}' is deprecated, and will be removed in version {ver}"
+            if alt:
+                msg += f" — use '{alt}' instead"
+            _log.warning(msg)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

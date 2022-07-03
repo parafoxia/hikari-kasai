@@ -63,10 +63,10 @@ class GatewayApp(hikari.GatewayBot):
 
     @staticmethod
     def print_banner(
-        banner: t.Optional[str],
+        banner: str | None,
         allow_color: bool,
         force_color: bool,
-        extra_args: t.Optional[t.Dict[str, str]] = None,
+        extra_args: dict[str, str] | None = None,
     ) -> None:
         super(GatewayApp, GatewayApp).print_banner(
             banner, allow_color, force_color, extra_args

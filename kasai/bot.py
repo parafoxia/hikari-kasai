@@ -68,16 +68,16 @@ class GatewayApp(hikari.GatewayBot):
             raise kasai.AlreadyConnected("there is already an active connection")
 
         loop = asyncio.get_running_loop()
-
         self._irc._create_sock()
         assert self._irc._sock is not None
+
         await loop.sock_connect(self._irc._sock, ("irc.chat.twitch.tv", 6667))
         await loop.sock_sendall(
             self._irc._sock,
             (
-                f"PASS {self._irc._token}\n"
-                f"NICK {self._irc.nickname}\n"
-                f"JOIN {self._irc.channel}\n"
+                f"PASS {self._irc._token}\r\n"
+                f"NICK {self._irc.nickname}\r\n"
+                f"JOIN {self._irc.channel}\r\n"
             ).encode("utf-8"),
         )
 
@@ -91,6 +91,8 @@ class GatewayApp(hikari.GatewayBot):
         if not self._irc._task:
             return
 
+        loop = asyncio.get_running_loop()
+        await loop.sock_sendall(self._irc._sock, b"PART\r\n")
         self._irc._sock.close()
         self._irc._sock = None
         if not self._irc._task.cancelled():

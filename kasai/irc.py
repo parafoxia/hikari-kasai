@@ -69,10 +69,10 @@ class IrcClient:
             resp = await loop.sock_recv(self._sock, 512)
 
             if resp.startswith(b"PING"):
-                await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv")
+                await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
                 _log.debug("PING received, sending PONG back")
 
-            if b"JOIN" in resp:
+            if b"353" in resp:
                 _log.info(f"joined {self.channel}")
 
             if b"PRIVMSG" not in resp:

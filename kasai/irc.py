@@ -47,7 +47,7 @@ class IrcClient:
     __slots__ = ("bot", "_token", "channel", "nickname", "_sock", "_task")
 
     def __init__(
-        self, bot: kasai.GatewayApp, token: str, channel: str, nickname: str
+        self, bot: kasai.GatewayBot, token: str, channel: str, nickname: str
     ) -> None:
         self.bot = bot
         self._token = token.strip()

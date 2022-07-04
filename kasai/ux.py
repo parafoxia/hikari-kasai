@@ -48,7 +48,7 @@ def display_splash() -> None:
     cli.main()
 
 
-def depr_warn(thing: str, ver: str, resolution: str) -> None:
+def depr_warn(thing: str, ver: str, resolution: str | None) -> None:
     msg = f"'{thing}' is deprecated, and will be removed in v{ver}"
     if resolution:
         msg += f" — {resolution}"

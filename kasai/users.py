@@ -51,12 +51,12 @@ class UserType(enum.Enum):
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class User:
     """A dataclass representing a Twitch user. All attributes must be
-    passed to the contructor on creation, though you should never need
+    passed to the constructor on creation, though you should never need
     to create this yourself.
 
     .. note::
         This does not necessarily represent a global user. The values
-        of some attributes are dependant on context, often the channel
+        of some attributes are dependent on context, often the channel
         the user was in when they sent a message.
     """
 

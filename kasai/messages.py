@@ -44,7 +44,7 @@ _MSG_PATTERN = re.compile(r":[^#]*([^ ]*) :(.*)")
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class PrivMessage:
     """A dataclass representing a PRIVMSG message. All attributes must
-    be passed to the contructor on creation, though you should never
+    be passed to the constructor on creation, though you should never
     need to create this yourself.
     """
 

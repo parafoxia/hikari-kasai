@@ -269,7 +269,7 @@ if "hikari-lightbulb" in _libs:
                 "0.7a",
                 (
                     "you will need to subclass to use command handlers in future; "
-                    "refer to README or docs for more information"
+                    "refer to README for more information"
                 ),
             )
 
@@ -290,6 +290,6 @@ if "hikari-crescent" in _libs:
                 "0.7a",
                 (
                     "you will need to subclass to use command handlers in future; "
-                    "refer to README or docs for more information"
+                    "refer to README for more information"
                 ),
             )

@@ -41,6 +41,10 @@ _log = logging.getLogger(__name__)
 
 
 class IrcClient:
+    """A client for IRC operations. This never needs to be created
+    manually, as it will be automatically attached to your bot.
+    """
+
     __slots__ = ("bot", "_token", "channel", "nickname", "_sock", "_task")
 
     def __init__(
@@ -56,6 +60,12 @@ class IrcClient:
 
     @property
     def is_alive(self) -> bool:
+        """Whether the client is connected to a Twitch channel.
+
+        Returns:
+            :obj:`bool`
+        """
+
         return self._sock is not None
 
     def _create_sock(self) -> None:
@@ -95,6 +105,23 @@ class IrcClient:
         await self.bot.close_irc()
 
     async def create_message(self, content: str) -> kasai.Message:
+        """Send a message to your channel's chat.
+
+        Args:
+            content:
+                The content of the message. The maximum allowed message
+                length varies on a number of factors, but generally,
+                messages should not be longer than about 400 characters.
+
+        Returns:
+            :obj:`kasai.messages.Message`
+                An object containing message information.
+
+        Raises:
+            :obj:`kasai.errors.NotConnected`:
+                The client is not connected to a Twitch channel.
+        """
+
         if self._sock is None:
             raise kasai.NotConnected("no active connections to send a message to")
 

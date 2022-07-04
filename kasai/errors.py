@@ -30,12 +30,14 @@ __all__ = ("KasaiError", "NotConnected", "AlreadyConnected")
 
 
 class KasaiError(Exception):
-    ...
+    """The base exception class for all Kasai errors."""
 
 
 class NotConnected(KasaiError):
-    ...
+    """Exception thrown when operations that require the client to be
+    connected are attempted without the connection."""
 
 
 class AlreadyConnected(KasaiError):
-    ...
+    """Exception thrown when connection operations are attempted when
+    the client is already connected."""

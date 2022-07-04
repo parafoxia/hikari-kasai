@@ -45,22 +45,51 @@ if t.TYPE_CHECKING:
 @attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class KasaiEvent(Event):
+    """A dataclass representing a Kasai event. All instance attributes
+    must be passed to the constructor on creation.
+    """
+
     app: traits.RESTAware = attr.field(metadata={attr_extensions.SKIP_DEEP_COPY: True})
+    """The bot client instance."""
 
 
 @attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class IrcMessageCreateEvent(KasaiEvent):
+    """A dataclass created whenever the IRC client receives a new Twitch
+    chat message. All instance attributes must be passed to the
+    constructor on creation.
+    """
+
     message: Message
+    """The received message."""
 
     @property
     def user(self) -> str:
+        """The message author's username.
+
+        Returns:
+            :obj:`str`
+        """
+
         return self.message.user
 
     @property
     def channel(self) -> str:
+        """The channel the message was sent to.
+
+        Returns:
+            :obj:`str`
+        """
+
         return self.message.channel
 
     @property
     def content(self) -> str:
+        """The content of the message.
+
+        Returns:
+            :obj:`str`
+        """
+
         return self.message.content

@@ -40,15 +40,42 @@ _PATTERN = re.compile(r":([^!]*)!([^@]*)@([^ ]*) ([^ ]*) ([^ ]*) :(.*)")
 
 @attr.define(hash=True, weakref_slot=False)
 class Message:
+    """A dataclass representing a message. All instance attributes must
+    be passed to the constructor on creation."""
+
     nickname: str
+    """The message author's nickname."""
+
     user: str
+    """The message author's username."""
+
     host: str
+    """The message author's host."""
+
     type: str
+    """The message type."""
+
     channel: str
+    """The channel the message was sent to."""
+
     content: str
+    """The content of the message."""
 
     @classmethod
     def parse(cls, message: str) -> Message:
+        """Create a new instance from a raw IRC message.
+
+        .. note::
+            The message must be decoded before passing it through.
+
+        Args:
+            message:
+                The decoded IRC message.
+
+        Returns:
+            The newly created message.
+        """
+
         if match := _PATTERN.match(message):
             return cls(*match.groups())
         else:
@@ -56,6 +83,15 @@ class Message:
 
     @property
     def as_formatted(self) -> str:
+        """Return an instance in a IRC message format.
+
+        .. note::
+            This must be encoded before sending the message over IRC.
+
+        Returns:
+            :obj:`str`
+        """
+
         return (
             f":{self.nickname}!{self.user}@{self.host} "
             f"{self.type} {self.channel} :{self.content}\r\n"

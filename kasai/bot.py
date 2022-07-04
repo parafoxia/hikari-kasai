@@ -99,7 +99,7 @@ class GatewayApp(hikari.GatewayBot):
         """The IRC client to be used for IRC operations.
 
         Returns:
-            :obj:`kasai.IrcClient`
+            :obj:`kasai.irc.IrcClient`
         """
 
         return self._irc
@@ -109,7 +109,7 @@ class GatewayApp(hikari.GatewayBot):
         messages.
 
         Raises:
-            :obj:`kasai.AlreadyConnected`:
+            :obj:`kasai.errors.AlreadyConnected`:
                 Kasai is already connected to a Twitch channel.
         """
 
@@ -138,7 +138,7 @@ class GatewayApp(hikari.GatewayBot):
         Twitch channel.
 
         Raises:
-            :obj:`kasai.NotConnected`:
+            :obj:`kasai.errors.NotConnected`:
                 Kasai is not currently connected to a Twitch channel.
         """
 

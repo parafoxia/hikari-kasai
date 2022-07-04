@@ -46,7 +46,41 @@ _log = logging.getLogger(__name__)
 
 
 class GatewayApp(hikari.GatewayBot):
-    # __slots__ = ("_irc",)
+    """A subclass of :obj:`~hikari.impl.bot.GatewayBot` which includes
+    Twitch functionality.
+
+    If you wish to use a command handler, you can create a subclass
+    which inherits from this class and your preferred command handler's
+    bot class. Note that if you do this, Kasai's GatewayApp *must* be
+    inherited first.
+
+    For example:
+
+    .. code-block:: python
+
+        class Bot(kasai.GatewayApp, lightbulb.BotApp):
+            ...
+
+        bot = Bot(...)
+
+    Args:
+        token:
+            Your Discord bot's token.
+        irc_token:
+            Your Twitch IRC access token.
+        irc_channel:
+            The Twitch channel you want to connect to. This must be
+            prefixed with a hash (#).
+        irc_nickname:
+            The nickname your bot will use. This does not need to be the
+            same as your bot's account name, but may cause problems
+            if it is not.
+
+    Keyword Args:
+        **kwargs:
+            Additional keyword arguments to be passed to
+            :obj:`~hikari.impl.bot.GatewayBot`.
+    """
 
     def __init__(
         self,
@@ -61,9 +95,23 @@ class GatewayApp(hikari.GatewayBot):
 
     @property
     def irc(self) -> kasai.IrcClient:
+        """The IRC client to be used for IRC operations.
+
+        Returns:
+            :obj:`kasai.IrcClient`
+        """
+
         return self._irc
 
     async def start_irc(self) -> None:
+        """Connect to your channel's chat and start listening for
+        messages.
+
+        Raises:
+            :obj:`kasai.AlreadyConnected`:
+                Kasai is already connected to a Twitch channel.
+        """
+
         if self._irc._sock is not None:
             raise kasai.AlreadyConnected("there is already an active connection")
 
@@ -85,6 +133,14 @@ class GatewayApp(hikari.GatewayBot):
         _log.info("successfully started IRC websocket")
 
     async def close_irc(self) -> None:
+        """Stop listening for messages and close the connection to your
+        Twitch channel.
+
+        Raises:
+            :obj:`kasai.NotConnected`:
+                Kasai is not currently connected to a Twitch channel.
+        """
+
         if self._irc._sock is None:
             raise kasai.NotConnected("no active connections to close")
 

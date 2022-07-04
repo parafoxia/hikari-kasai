@@ -48,13 +48,17 @@ def display_splash() -> None:
     cli.main()
 
 
-def deprecated(ver: str, alt: str | None = None) -> t.Callable[[_FuncT], _FuncT]:
+def depr_warn(thing: str, ver: str, resolution: str) -> None:
+    msg = f"'{thing}' is deprecated, and will be removed in v{ver}"
+    if resolution:
+        msg += f" — {resolution}"
+    _log.warning(msg)
+
+
+def deprecated(ver: str, resolution: str | None = None) -> t.Callable[[_FuncT], _FuncT]:
     def decorator(func: _FuncT) -> _FuncT:
         def wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            msg = f"'{func.__qualname__}' is deprecated, and will be removed in version {ver}"
-            if alt:
-                msg += f" — use '{alt}' instead"
-            _log.warning(msg)
+            depr_warn(ver, func.__qualname__, resolution)
             return func(*args, **kwargs)
 
         return wrapper

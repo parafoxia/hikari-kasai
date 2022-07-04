@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import asyncio
 
-__all__ = ("GatewayApp", "LightbulbApp", "CrescentApp")
+__all__ = ("GatewayBot", "GatewayApp", "LightbulbApp", "CrescentApp")
 
 import logging
 import typing as t
@@ -40,13 +40,14 @@ import hikari
 from pkg_resources import working_set
 
 import kasai
+from kasai import ux
 
 _libs = [p.key for p in working_set]
 
 _log = logging.getLogger(__name__)
 
 
-class GatewayApp(hikari.GatewayBot):
+class GatewayBot(hikari.GatewayBot):
     """A subclass of :obj:`~hikari.impl.bot.GatewayBot` which includes
     Twitch functionality.
 
@@ -59,7 +60,7 @@ class GatewayApp(hikari.GatewayBot):
 
     .. code-block:: python
 
-        class Bot(kasai.GatewayApp, lightbulb.BotApp):
+        class Bot(kasai.GatewayBot, lightbulb.BotApp):
             ...
 
         bot = Bot(...)
@@ -196,20 +197,65 @@ class GatewayApp(hikari.GatewayBot):
         if extra_args:
             args.update(extra_args)
 
-        super(GatewayApp, GatewayApp).print_banner(
+        super(GatewayBot, GatewayBot).print_banner(
             banner, allow_color, force_color, extra_args=args
         )
+
+
+class GatewayApp(GatewayBot):
+    def __init__(
+        self,
+        token: str,
+        irc_token: str,
+        irc_channel: str,
+        irc_nickname: str,
+        **kwargs: t.Any,
+    ) -> None:
+        super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+        ux.depr_warn("kasai.GatewayApp", "0.7a", "use 'kasai.GatewayBot' instead")
 
 
 if "hikari-lightbulb" in _libs:
     import lightbulb
 
-    class LightbulbApp(GatewayApp, lightbulb.BotApp):
-        ...
+    class LightbulbApp(GatewayBot, lightbulb.BotApp):
+        def __init__(
+            self,
+            token: str,
+            irc_token: str,
+            irc_channel: str,
+            irc_nickname: str,
+            **kwargs: t.Any,
+        ) -> None:
+            super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+            ux.depr_warn(
+                "kasai.LightbulbApp",
+                "0.7a",
+                (
+                    "you will need to subclass to use command handlers in future; "
+                    "refer to README or docs for more information"
+                ),
+            )
 
 
 if "hikari-crescent" in _libs:
     import crescent
 
-    class CrescentApp(GatewayApp, crescent.Bot):
-        ...
+    class CrescentApp(GatewayBot, crescent.Bot):
+        def __init__(
+            self,
+            token: str,
+            irc_token: str,
+            irc_channel: str,
+            irc_nickname: str,
+            **kwargs: t.Any,
+        ) -> None:
+            super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+            ux.depr_warn(
+                "kasai.CrescentApp",
+                "0.7a",
+                (
+                    "you will need to subclass to use command handlers in future; "
+                    "refer to README or docs for more information"
+                ),
+            )

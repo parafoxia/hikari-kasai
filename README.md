@@ -4,7 +4,7 @@ A bridge between Discord and Twitch chat.
 
 ## Installation
 
-To install the latest stable version of *hikari-kasai*, use the following command:
+To install the latest released version of *Kasai*, use the following command:
 ```sh
 pip install hikari-kasai
 ```
@@ -16,68 +16,71 @@ pip install git+https://github.com/parafoxia/hikari-kasai
 
 You may need to prefix these commands with a call to the Python interpreter depending on your OS and Python configuration.
 
-## Usage
+## Creating your bot
 
-All methods relating to Twitch can be accessed through `bot.irc`.
-
-*hikari-kasai* officially supports Hikari, as well as the Lightbulb and Crescent command handlers:
+*Kasai* provides a subclass for `hikari.GatewayBot` that contains methods and attributes for Twitch chat interfacing.
 
 ```py
-kasai.GatewayApp(...)
-kasai.LightbulbApp(...)
-kasai.CrescentApp(...)
+import kasai
+
+bot = kasai.GatewayBot(...)
 ```
 
-However, you can use *hikari-kasai*, with any command handler you like, so long as it doesn't conflict.
-To do this, you can create a subclassed bot:
+To use *Kasai* with command handlers, you will need to create a custom subclass that inherits from both `kasai.GatewayBot` and your command handler's bot class.
+For example, if you want to use *Lightbulb*:
 
 ```py
 import kasai
 import lightbulb
 
-
-class Bot(kasai.GatewayApp, lightbulb.BotApp):
+class Bot(kasai.GatewayBot, lightbulb.BotApp):
     ...
-
 
 bot = Bot(...)
 ```
 
-Providing you inherit from `GatewayApp` first, you do not need to provide an `__init__`.
+## Usage
 
-A full working implementation could look something like this:
+A working implementation could look something like this:
 
 ```py
+import os
+
+import dotenv
 import hikari
 import kasai
 
-# This can also be LightbulbApp or CrescentApp.
-bot = kasai.GatewayApp(
-    discord_token,
-    irc_token,
-    channel,
-    nickname,
-    **[kwargs for superclass],
-)
+# You will need a .env file for this.
+dotenv.load_dotenv()
 
+# Create the bot.
+bot = kasai.GatewayBot(
+    os.environ["TOKEN"],
+    os.environ["IRC_TOKEN"],
+    os.environ["CHANNEL"],
+    os.environ["NICKNAME"],
+)
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def on_message(event):
-    if event.content == "start":
+    if event.content == "!start":
+        # Start listening for messages.
         await bot.start_irc()
 
-    elif event.content == "close":
+    elif event.content == "!close":
+        # Stop listening for messages.
         await bot.close_irc()
 
-    elif event.content.startswith("send"):
-        await bot.irc.create_message(event.content[5:])
-
+    elif event.content.startswith("!send"):
+        # Send a message to Twitch chat.
+        await bot.irc.create_message(event.content[6:])
 
 @bot.listen(kasai.IrcMessageCreateEvent)
 async def on_irc_message(event):
+    # Display message information.
     print(f"{event.user} said: {event.content}")
 
-
+# Run the bot.
 bot.run()
 ```
 

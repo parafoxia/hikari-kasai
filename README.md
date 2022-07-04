@@ -57,15 +57,13 @@ dotenv.load_dotenv()
 bot = kasai.GatewayBot(
     os.environ["TOKEN"],
     os.environ["IRC_TOKEN"],
-    os.environ["CHANNEL"],
-    os.environ["NICKNAME"],
 )
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def on_message(event):
     if event.content == "!start":
         # Start listening for messages.
-        await bot.start_irc()
+        await bot.start_irc("#channel1", "#channel2")
 
     elif event.content == "!close":
         # Stop listening for messages.
@@ -73,12 +71,12 @@ async def on_message(event):
 
     elif event.content.startswith("!send"):
         # Send a message to Twitch chat.
-        await bot.irc.create_message(event.content[6:])
+        await bot.twitch.create_message("#channel1", event.content[6:])
 
-@bot.listen(kasai.IrcMessageCreateEvent)
-async def on_irc_message(event):
+@bot.listen(kasai.PrivMessageCreateEvent)
+async def on_twitch_message(event):
     # Display message information.
-    print(f"{event.user} said: {event.content}")
+    print(f"{event.author.name} said {event.content} in {event.channel.name}")
 
 # Run the bot.
 bot.run()

@@ -29,7 +29,7 @@
 from __future__ import annotations
 
 __productname__ = "hikari-kasai"
-__version__ = "0.2a"
+__version__ = "0.3a"
 __description__ = "A bridge between Discord and Twitch chat."
 __url__ = "https://github.com/parafoxia/hikari-kasai"
 __docs__ = "https://hikari-kasai.readthedocs.io"

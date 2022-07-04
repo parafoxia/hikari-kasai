@@ -27,61 +27,23 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from __future__ import annotations
+import sys
 
 __all__ = ("BANNER", "display_splash", "deprecated")
 
 import logging
-import platform
 import typing as t
-from importlib.util import find_spec
 
 import kasai
+from hikari import cli
 
 _log = logging.getLogger(__name__)
 _FuncT = t.Callable[..., t.Any]
 
-BANNER = r"""
-       {r}    )
-       {r} ( /(     )         )  (
-       {r} )\()) ( /(  (   ( /(  )\
-       {o}((_)\  )(_)) )\  )(_))((_)
-       {o}| |(_)((_)_ ((_)((_)_  (_)
-       {y}| / / / _` |(_-</ _` | | |{x}
-hikari-{y}|_\_\ \__,_|/__/\__,_| |_|{x}
-""".format(
-    r="\33[38;5;1m",
-    o="\33[38;5;208m",
-    y="\33[38;5;3m",
-    x="\33[0m",
-)
-
-
-def _install_location() -> str:
-    spec = find_spec("kasai")
-
-    if spec:
-        if spec.submodule_search_locations:
-            return spec.submodule_search_locations[0]
-
-    return "unknown"
-
 
 def display_splash() -> None:
-    print(
-        BANNER + "\n"
-        f"\33[3m{kasai.__description__}\33[0m\n\n"
-        f"You're using version \33[1m{kasai.__version__}\33[0m.\n\n"
-        f"\33[1m\33[38;5;1mInformation:\33[0m\n"
-        f" • Python version: {platform.python_version()} "
-        f"({platform.python_implementation()})\n"
-        f" • Operating system: {platform.system()} ({platform.release()})\n"
-        f" • Installed in: {_install_location()}\n\n"
-        f"\33[1m\33[38;5;208mUseful links:\33[0m\n"
-        f" • Documentation: \33[4m{kasai.__docs__}\33[0m\n"
-        f" • Source: \33[4m{kasai.__url__}\33[0m\n"
-        f" • Changelog: \33[4m{kasai.__changelog__}\33[0m\n\n"
-        f"\33[1m\33[38;5;3mThanks for using kasai!\33[0m"
-    )
+    sys.stderr.write(f"hikari-kasai ({kasai.__version__})\n")
+    cli.main()
 
 
 def deprecated(ver: str, alt: str | None = None) -> t.Callable[[_FuncT], _FuncT]:

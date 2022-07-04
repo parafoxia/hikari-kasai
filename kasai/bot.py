@@ -34,6 +34,7 @@ __all__ = ("GatewayApp", "LightbulbApp", "CrescentApp")
 
 import logging
 import typing as t
+from importlib.util import find_spec
 
 import hikari
 from pkg_resources import working_set
@@ -90,7 +91,7 @@ class GatewayApp(hikari.GatewayBot):
         irc_nickname: str,
         **kwargs: t.Any,
     ) -> None:
-        super().__init__(token, **kwargs)
+        super().__init__(token, banner="kasai", **kwargs)
         self._irc = kasai.IrcClient(self, irc_token, irc_channel, irc_nickname)
 
     @property
@@ -167,13 +168,36 @@ class GatewayApp(hikari.GatewayBot):
         force_color: bool,
         extra_args: dict[str, str] | None = None,
     ) -> None:
+        def _install_location() -> str:
+            spec = find_spec("kasai")
+
+            if spec:
+                if spec.submodule_search_locations:
+                    return spec.submodule_search_locations[0]
+
+            return "unknown"
+
+        args = {
+            "kasai_icon": "\33[1m\33[38;5;1m火\33[38;5;208m災",
+            "hikari_icon": "\33[1m\33[38;5;135m光",
+            "kasai_version": kasai.__version__,
+            "kasai_install_location": _install_location(),
+            "kasai_documentation_url": kasai.__docs__,
+            "c1": "\33[1m\33[38;5;196m",
+            "c2": "\33[1m\33[38;5;202m",
+            "c3": "\33[1m\33[38;5;166m",
+            "c4": "\33[1m\33[38;5;172m",
+            "c5": "\33[1m\33[38;5;214m",
+            "c6": "\33[1m\33[38;5;227m",
+            "c7": "\33[1m\33[38;5;229m",
+            "c8": "\33[1m\33[38;5;231m",
+        }
+
+        if extra_args:
+            args.update(extra_args)
+
         super(GatewayApp, GatewayApp).print_banner(
-            banner, allow_color, force_color, extra_args
-        )
-        print(
-            f"Thanks for using "
-            f"\33[1m\33[38;5;1m火\33[38;5;208m災 \33[38;5;3mkasai\33[0m "
-            f"(v\33[1m{kasai.__version__}\33[0m)!\n"
+            banner, allow_color, force_color, extra_args=args
         )
 
 

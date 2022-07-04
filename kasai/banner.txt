@@ -1,0 +1,9 @@
+
+${c1}888    d8P                             d8b      ${reset}${kasai_icon} ${bold_white}${kasai_version} ${thin_white}(for ${hikari_icon} ${thin_white}${hikari_version})${reset}
+${c2}888   d8P                              Y8P      ${reset}${kasai_icon} ${bold_white}© 2022-present Ethan Henderson${thin_white} - BSD 3-Clause license${reset}
+${c3}888  d8P                                        ${reset}${hikari_icon}  ${bold_white} ${hikari_copyright}${thin_white} - ${hikari_license} license${reset}
+${c4}888d88K      8888b.  .d8888b   8888b.  888      ${reset}${bold_white}interpreter:   ${thin_white}${python_implementation} ${python_version}${reset}
+${c5}8888888b        "88b 88K          "88b 888      ${reset}${bold_white}running on:    ${thin_white}${system_description}${reset}
+${c6}888  Y88b   .d888888 "Y8888b. .d888888 888      ${reset}${bold_white}installed at:  ${thin_white}${kasai_install_location}${reset}
+${c7}888   Y88b  888  888      X88 888  888 888      ${reset}${bold_white}documentation: ${thin_white}${kasai_documentation_url}${reset}
+${c8}888    Y88b "Y888888  88888P' "Y888888 888      ${reset}${bold_white}support:       ${thin_white}${hikari_discord_invite}${reset}

@@ -85,7 +85,6 @@ class TwitchClient:
         while True:
             resp = await loop.sock_recv(self._sock, 512)
             data = resp.decode("utf-8").strip()
-            print(data)
             _log.debug(f"received IRC message: {data}")
 
             if resp.startswith(b"PING"):

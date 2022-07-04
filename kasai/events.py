@@ -61,6 +61,11 @@ class PrivMessageCreateEvent(KasaiEvent):
     """A dataclass created whenever the client receives a new Twitch
     chat message. All instance attributes must be passed to the
     constructor on creation.
+
+    .. important::
+        This event is not triggered when a bot sends a message. No
+        events for this eventuality exist yet, but it will be a separate
+        event called :code:`UserstateMessageCreateEvent`.
     """
 
     message: PrivMessage

@@ -1,0 +1,2 @@
+furo
+sphinx>=5,<6

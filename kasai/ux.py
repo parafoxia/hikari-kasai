@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from __future__ import annotations
+
 import sys
 
 __all__ = ("BANNER", "display_splash", "deprecated")
@@ -34,8 +35,9 @@ __all__ = ("BANNER", "display_splash", "deprecated")
 import logging
 import typing as t
 
-import kasai
 from hikari import cli
+
+import kasai
 
 _log = logging.getLogger(__name__)
 _FuncT = t.Callable[..., t.Any]

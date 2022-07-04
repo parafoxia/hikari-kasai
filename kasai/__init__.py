@@ -44,7 +44,6 @@ from kasai.bot import *
 from kasai.channels import *
 from kasai.errors import *
 from kasai.events import *
-from kasai.irc import *
 from kasai.messages import *
 from kasai.twitch import *
 from kasai.users import *

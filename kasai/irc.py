@@ -35,7 +35,6 @@ import logging
 import socket
 
 import kasai
-from kasai import ux
 
 _log = logging.getLogger(__name__)
 
@@ -95,14 +94,6 @@ class IrcClient:
                     message=kasai.Message.parse(data), app=self.bot
                 )
             )
-
-    @ux.deprecated("0.4a", "GatewayApp.start_irc")
-    async def start(self) -> None:
-        await self.bot.start_irc()
-
-    @ux.deprecated("0.4a", "GatewayApp.close_irc")
-    async def close(self) -> None:
-        await self.bot.close_irc()
 
     async def create_message(self, content: str) -> kasai.Message:
         """Send a message to your channel's chat.

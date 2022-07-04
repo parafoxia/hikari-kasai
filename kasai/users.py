@@ -64,7 +64,8 @@ class User:
     """The user's ID."""
 
     color: int
-    """The user's colour in the current context."""
+    """The user's colour in the current context. This is an integer
+    representation of the colour's hex code."""
 
     display_name: str
     """The user's display name."""

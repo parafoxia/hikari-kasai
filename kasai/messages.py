@@ -55,7 +55,7 @@ class PrivMessage:
     """The author of the message."""
 
     channel: kasai.Channel
-    """The channel the message went sent in."""
+    """The channel the message was sent in."""
 
     created_at: dt.datetime
     """The date and time the message was sent."""

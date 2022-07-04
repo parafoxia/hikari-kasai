@@ -140,8 +140,8 @@ class GatewayBot(hikari.GatewayBot):
             *channels:
                 The channels to join once connected. This can be empty,
                 in which case you will need to manually join your
-                channel(s) later manually. All channels must be
-                prefixed with a hash (#).
+                channel(s) later. All channels must be prefixed with a
+                hash (#).
 
         Raises:
             :obj:`kasai.errors.AlreadyConnected`:

@@ -40,6 +40,21 @@ _log = logging.getLogger(__name__)
 
 
 class TwitchClient:
+    """A class for interacting with Twitch. This is available through
+    :obj:`kasai.bot.GatewayBot.twitch`, and should never need to be
+    manually instantiated.
+
+    Args:
+        bot:
+            The bot instance.
+        token:
+            Your Twitch IRC token
+
+    Attributes:
+        bot (:obj:`kasai.bot.GatewayBot`):
+            The bot instance.
+    """
+
     __slots__ = ("bot", "_token", "_nickname", "_sock", "_task")
 
     def __init__(self, bot: kasai.GatewayBot, token: str) -> None:

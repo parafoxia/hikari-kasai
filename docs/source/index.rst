@@ -6,7 +6,9 @@ Kasai
    :caption: Contents:
 
    api/bot
-   api/irc
+   api/twitch
    api/messages
+   api/users
+   api/channels
    api/events
    api/errors

@@ -43,15 +43,44 @@ _MSG_PATTERN = re.compile(r":[^#]*([^ ]*) :(.*)")
 
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class PrivMessage:
+    """A dataclass representing a PRIVMSG message. All attributes must
+    be passed to the contructor on creation, though you should never
+    need to create this yourself.
+    """
+
     id: str
+    """The message's unique ID."""
+
     author: kasai.User
+    """The author of the message."""
+
     channel: kasai.Channel
+    """The channel the message went sent in."""
+
     created_at: dt.datetime
+    """The date and time the message was sent."""
+
     bits: int
+    """The number of bits cheered in the message."""
+
     content: str
+    """The content of the message."""
 
     @classmethod
     def new(cls, data: str) -> PrivMessage:
+        """Create a new instance from raw (decoded) message data.
+
+        .. note::
+            The message data *must* be decoded before being passed.
+
+        Args:
+            data:
+                The raw (decoded) message data.
+
+        Returns:
+            A new instance.
+        """
+
         tags, message = data.split(" ", maxsplit=1)
         match = _MSG_PATTERN.match(message)
         assert match

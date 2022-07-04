@@ -36,27 +36,73 @@ import attr
 
 
 class UserType(enum.Enum):
+    """An enum representing a user type."""
+
     NORMAL = ""
+    """"""
     ADMIN = "admin"
+    """"""
     GLOBAL_MOD = "global_mod"
+    """"""
     STAFF = "staff"
+    """"""
 
 
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class User:
+    """A dataclass representing a Twitch user. All attributes must be
+    passed to the contructor on creation, though you should never need
+    to create this yourself.
+
+    .. note::
+        This does not necessarily represent a global user. The values
+        of some attributes are dependant on context, often the channel
+        the user was in when they sent a message.
+    """
+
     id: str
+    """The user's ID."""
+
     color: int
+    """The user's colour in the current context."""
+
     display_name: str
+    """The user's display name."""
+
     is_mod: bool
+    """Whether the user is a mod in the current context."""
+
     is_subscriber: bool
+    """Whether the user is a subscriber in the current context."""
+
     is_turbo: bool
+    """Whether the user has ads turned off globally."""
+
     is_broadcaster: bool
+    """Whether the user is the broadcaster."""
+
     type: UserType
+    """The user type. This will be :obj:`UserType.NORMAL` unless the
+    user works for Twitch."""
 
     @property
     def username(self) -> str:
+        """The user's username. This is always their display name in
+        all lower case.
+
+        Returns:
+            :obj:`str`
+        """
+
         return self.display_name.lower()
 
     @property
     def colour(self) -> int:
+        """An alias for those who can spell correctly. This is an
+        integer representation of the colour's hex code.
+
+        Return:
+            :obj:`int`
+        """
+
         return self.color

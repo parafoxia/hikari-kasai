@@ -94,14 +94,41 @@ class TwitchClient:
             )
 
     async def join(self, *channels: str) -> None:
+        """Join a Twitch channel.
+
+        Args:
+            *channels:
+                The channels to join. This can be empty, in which case,
+                nothing will happen.
+
+        Raises:
+            :obj:`kasai.errors.NotConnected`:
+                The client is not connected to Twitch.
+        """
+
         if self._sock is None:
             raise kasai.NotConnected("no active connections")
+
+        if not channels:
+            return
 
         loop = asyncio.get_running_loop()
         msg = "\r\n".join(f"JOIN {c}" for c in channels) + "\r\n"
         await loop.sock_sendall(self._sock, msg.encode("utf-8"))
 
     async def part(self, *channels: str) -> None:
+        """Part (or leave) a Twitch channel.
+
+        Args:
+            *channels:
+                The channels to part. This can be empty, in which case,
+                nothing will happen.
+
+        Raises:
+            :obj:`kasai.errors.NotConnected`:
+                The client is not connected to Twitch.
+        """
+
         if self._sock is None:
             raise kasai.NotConnected("no active connections")
 

@@ -64,15 +64,34 @@ class PrivMessageCreateEvent(KasaiEvent):
     """
 
     message: PrivMessage
+    """The message that was sent."""
 
     @property
     def author(self) -> kasai.User:
+        """The message's author.
+
+        Returns:
+            :obj:`kasai.users.User`
+        """
+
         return self.message.author
 
     @property
     def channel(self) -> kasai.Channel:
+        """The channel the message was sent to.
+
+        Returns:
+            :obj:`kasai.channels.Channel`
+        """
+
         return self.message.channel
 
     @property
     def content(self) -> str:
+        """The content of the message.
+
+        Returns:
+            :obj:`str`
+        """
+
         return self.message.content

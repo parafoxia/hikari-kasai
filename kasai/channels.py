@@ -35,5 +35,13 @@ import attr
 
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class Channel:
+    """A dataclass representing a Twitch channel. All attributes must
+    be passed to the contructor on creation, though you should never
+    need to create this yourself.
+    """
+
     id: str
+    """The channel's ID."""
+
     name: str
+    """The name of the channel."""

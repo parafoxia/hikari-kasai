@@ -28,13 +28,14 @@
 
 from __future__ import annotations
 
-import asyncio
-
 __all__ = ("GatewayBot", "GatewayApp", "LightbulbApp", "CrescentApp")
 
+import asyncio
 import logging
 import typing as t
+from hashlib import sha256
 from importlib.util import find_spec
+from time import time
 
 import hikari
 from pkg_resources import working_set
@@ -70,13 +71,6 @@ class GatewayBot(hikari.GatewayBot):
             Your Discord bot's token.
         irc_token:
             Your Twitch IRC access token.
-        irc_channel:
-            The Twitch channel you want to connect to. This must be
-            prefixed with a hash (#).
-        irc_nickname:
-            The nickname your bot will use. This does not need to be the
-            same as your bot's account name, but may cause problems
-            if it is not.
 
     Keyword Args:
         **kwargs:
@@ -88,77 +82,123 @@ class GatewayBot(hikari.GatewayBot):
         self,
         token: str,
         irc_token: str,
-        irc_channel: str,
-        irc_nickname: str,
+        channel: str | None = None,
+        nickname: str | None = None,
+        /,
         **kwargs: t.Any,
     ) -> None:
+        if channel:
+            ux.depr_warn(
+                "channel",
+                "v0.6a",
+                (
+                    "the 'channel' argument should now be passed to "
+                    "GatewayBot.start_irc — it no longer works here"
+                ),
+            )
+
+        if nickname:
+            ux.depr_warn(
+                "nickname", "v0.6a", "the 'nickname' argument is no longer in use"
+            )
+
         super().__init__(token, banner="kasai", **kwargs)
-        self._irc = kasai.IrcClient(self, irc_token, irc_channel, irc_nickname)
+        self._twitch = kasai.TwitchClient(self, irc_token)
 
     @property
-    def irc(self) -> kasai.IrcClient:
-        """The IRC client to be used for IRC operations.
+    def irc(self) -> kasai.TwitchClient:
+        ux.depr_warn(
+            "GatewayBot.irc",
+            "0.6a",
+            (
+                "use `GatewayBot.twitch` instead. The old IRC client has been replaced "
+                "with a new Twitch one, which means that there are some breaking "
+                "changes that could not be deprecated"
+            ),
+        )
+        return self._twitch
+
+    @property
+    def twitch(self) -> kasai.TwitchClient:
+        """The Twitch IRC client interface.
 
         Returns:
-            :obj:`kasai.irc.IrcClient`
+            :obj:`kasai.twitch.TwitchClient`
         """
 
-        return self._irc
+        return self._twitch
 
-    async def start_irc(self) -> None:
-        """Connect to your channel's chat and start listening for
-        messages.
+    @staticmethod
+    def _unique_id() -> str:
+        return sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
+
+    async def start_irc(self, *channels: str) -> None:
+        """Create a websocket connection to Twitch's IRC servers and
+        start listening for messages.
+
+        Args:
+            *channels:
+                The channels to join once connected. This can be empty,
+                in which case you will need to manually join your
+                channel(s) later manually. All channels must be
+                prefixed with a hash (#).
 
         Raises:
             :obj:`kasai.errors.AlreadyConnected`:
                 Kasai is already connected to a Twitch channel.
         """
 
-        if self._irc._sock is not None:
+        if self._twitch._sock is not None:
             raise kasai.AlreadyConnected("there is already an active connection")
 
         loop = asyncio.get_running_loop()
-        self._irc._create_sock()
-        assert self._irc._sock is not None
+        self._twitch._create_sock()
+        assert self._twitch._sock is not None
 
-        await loop.sock_connect(self._irc._sock, ("irc.chat.twitch.tv", 6667))
+        await loop.sock_connect(self._twitch._sock, ("irc.chat.twitch.tv", 6667))
+        _log.info("connected to Twitch")
+
+        self._twitch._nickname = self._unique_id()
         await loop.sock_sendall(
-            self._irc._sock,
+            self._twitch._sock,
             (
-                f"PASS {self._irc._token}\r\n"
-                f"NICK {self._irc.nickname}\r\n"
-                f"JOIN {self._irc.channel}\r\n"
-            ).encode("utf-8"),
+                f"PASS {self._twitch._token}\r\n"
+                f"NICK {self._twitch._nickname}\r\n"
+                "CAP REQ :twitch.tv/commands twitch.tv/tags\r\n"
+            ).encode(),
         )
 
-        self._irc._task = loop.create_task(self._irc._listen(loop))
+        self._twitch._task = loop.create_task(self._twitch._irclisten(loop))
         _log.info("successfully started IRC websocket")
+
+        if channels:
+            await self._twitch.join(*channels)
 
     async def close_irc(self) -> None:
         """Stop listening for messages and close the connection to your
-        Twitch channel.
+        Twitch channel(s).
 
         Raises:
             :obj:`kasai.errors.NotConnected`:
                 Kasai is not currently connected to a Twitch channel.
         """
 
-        if self._irc._sock is None:
+        if self._twitch._sock is None:
             raise kasai.NotConnected("no active connections to close")
 
-        if not self._irc._task:
+        if not self._twitch._task:
             return
 
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._irc._sock, b"PART\r\n")
-        self._irc._sock.close()
-        self._irc._sock = None
-        if not self._irc._task.cancelled():
-            self._irc._task.cancel()
+        await loop.sock_sendall(self._twitch._sock, b"PART\r\n")
+        self._twitch._sock.close()
+        self._twitch._sock = None
+        if not self._twitch._task.cancelled():
+            self._twitch._task.cancel()
         _log.info("successfully closed IRC websocket")
 
     async def _close(self) -> None:
-        if self._irc.is_alive:
+        if self._twitch.is_alive:
             await self.close_irc()
         return await super()._close()
 
@@ -207,11 +247,9 @@ class GatewayApp(GatewayBot):
         self,
         token: str,
         irc_token: str,
-        irc_channel: str,
-        irc_nickname: str,
         **kwargs: t.Any,
     ) -> None:
-        super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+        super().__init__(token, irc_token, **kwargs)
         ux.depr_warn("kasai.GatewayApp", "0.7a", "use 'kasai.GatewayBot' instead")
 
 
@@ -223,11 +261,9 @@ if "hikari-lightbulb" in _libs:
             self,
             token: str,
             irc_token: str,
-            irc_channel: str,
-            irc_nickname: str,
             **kwargs: t.Any,
         ) -> None:
-            super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+            super().__init__(token, irc_token, **kwargs)
             ux.depr_warn(
                 "kasai.LightbulbApp",
                 "0.7a",
@@ -246,11 +282,9 @@ if "hikari-crescent" in _libs:
             self,
             token: str,
             irc_token: str,
-            irc_channel: str,
-            irc_nickname: str,
             **kwargs: t.Any,
         ) -> None:
-            super().__init__(token, irc_token, irc_channel, irc_nickname, **kwargs)
+            super().__init__(token, irc_token, **kwargs)
             ux.depr_warn(
                 "kasai.CrescentApp",
                 "0.7a",

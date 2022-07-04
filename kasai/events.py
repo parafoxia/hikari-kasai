@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("KasaiEvent", "IrcMessageCreateEvent")
+__all__ = ("KasaiEvent", "PrivMessageCreateEvent")
 
 import typing as t
 
@@ -36,10 +36,12 @@ import attr
 from hikari import Event
 from hikari.internal import attr_extensions
 
+import kasai
+
 if t.TYPE_CHECKING:
     from hikari import traits
 
-    from kasai.messages import Message
+    from kasai.messages import PrivMessage
 
 
 @attr_extensions.with_copy
@@ -55,41 +57,22 @@ class KasaiEvent(Event):
 
 @attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class IrcMessageCreateEvent(KasaiEvent):
-    """A dataclass created whenever the IRC client receives a new Twitch
+class PrivMessageCreateEvent(KasaiEvent):
+    """A dataclass created whenever the client receives a new Twitch
     chat message. All instance attributes must be passed to the
     constructor on creation.
     """
 
-    message: Message
-    """The received message."""
+    message: PrivMessage
 
     @property
-    def user(self) -> str:
-        """The message author's username.
-
-        Returns:
-            :obj:`str`
-        """
-
-        return self.message.user
+    def author(self) -> kasai.User:
+        return self.message.author
 
     @property
-    def channel(self) -> str:
-        """The channel the message was sent to.
-
-        Returns:
-            :obj:`str`
-        """
-
+    def channel(self) -> kasai.Channel:
         return self.message.channel
 
     @property
     def content(self) -> str:
-        """The content of the message.
-
-        Returns:
-            :obj:`str`
-        """
-
         return self.message.content

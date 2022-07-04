@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("IrcClient",)
+__all__ = ("TwitchClient",)
 
 import asyncio
 import logging
@@ -39,27 +39,20 @@ import kasai
 _log = logging.getLogger(__name__)
 
 
-class IrcClient:
-    """A client for IRC operations. This never needs to be created
-    manually, as it will be automatically attached to your bot.
-    """
+class TwitchClient:
+    __slots__ = ("bot", "_token", "_nickname", "_sock", "_task")
 
-    __slots__ = ("bot", "_token", "channel", "nickname", "_sock", "_task")
-
-    def __init__(
-        self, bot: kasai.GatewayBot, token: str, channel: str, nickname: str
-    ) -> None:
+    def __init__(self, bot: kasai.GatewayBot, token: str) -> None:
         self.bot = bot
-        self._token = token.strip()
-        self.channel = channel
-        self.nickname = nickname
-
+        self._token = token
+        self._nickname = ""
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
 
     @property
     def is_alive(self) -> bool:
-        """Whether the client is connected to a Twitch channel.
+        """Whether the websocket is open. This does not necessarily mean
+        it's connected to a channel.
 
         Returns:
             :obj:`bool`
@@ -71,42 +64,63 @@ class IrcClient:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
-    async def _listen(self, loop: asyncio.AbstractEventLoop) -> None:
+    async def _irclisten(self, loop: asyncio.AbstractEventLoop) -> None:
         assert self._sock
 
         while True:
             resp = await loop.sock_recv(self._sock, 512)
+            data = resp.decode("utf-8").strip()
+            print(data)
+            _log.debug(f"received IRC message: {data}")
 
             if resp.startswith(b"PING"):
                 await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
-                _log.debug("PING received, sending PONG back")
+                continue
 
-            if b"353" in resp:
-                _log.info(f"joined {self.channel}")
+            if b"ACK" in resp:
+                _log.debug("capabilities acknowledged")
+                continue
+
+            if b"JOIN" in resp:
+                _log.info(f"joined channel")
+                continue
 
             if b"PRIVMSG" not in resp:
                 continue
 
-            data = resp.decode("utf-8").strip()
-            _log.debug(f"received message: {data}")
+            message = kasai.PrivMessage.new(data)
             self.bot.dispatch(
-                kasai.IrcMessageCreateEvent(
-                    message=kasai.Message.parse(data), app=self.bot
-                )
+                kasai.PrivMessageCreateEvent(message=message, app=self.bot)
             )
 
-    async def create_message(self, content: str) -> kasai.Message:
-        """Send a message to your channel's chat.
+    async def join(self, *channels: str) -> None:
+        if self._sock is None:
+            raise kasai.NotConnected("no active connections")
+
+        loop = asyncio.get_running_loop()
+        msg = "\r\n".join(f"JOIN {c}" for c in channels) + "\r\n"
+        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+
+    async def part(self, *channels: str) -> None:
+        if self._sock is None:
+            raise kasai.NotConnected("no active connections")
+
+        loop = asyncio.get_running_loop()
+        msg = "\r\n".join(f"PART {c}" for c in channels) + "\r\n"
+        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+
+    async def create_message(self, channel: str, content: str) -> None:
+        """Send a message to a given channel's chat. The client must
+        have joined that channel to send a message.
 
         Args:
+            channel:
+                The channel to send the message to. This must be
+                prefixed with a hash (#).
             content:
                 The content of the message. The maximum allowed message
                 length varies on a number of factors, but generally,
                 messages should not be longer than about 400 characters.
-
-        Returns:
-            :obj:`kasai.messages.Message`
-                An object containing message information.
 
         Raises:
             :obj:`kasai.errors.NotConnected`:
@@ -116,15 +130,9 @@ class IrcClient:
         if self._sock is None:
             raise kasai.NotConnected("no active connections to send a message to")
 
-        message = kasai.Message(
-            self.nickname,
-            self.nickname,
-            f"{self.nickname}.tmi.twitch.tv",
-            "PRIVMSG",
-            self.channel,
-            content,
+        msg = (
+            f":{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv "
+            f"PRIVMSG {channel} {content}\r\n"
         )
-        loop = asyncio.get_event_loop()
-        await loop.sock_sendall(self._sock, message.as_formatted.encode())
-        self.bot.dispatch(kasai.IrcMessageCreateEvent(message=message, app=self.bot))
-        return message
+        loop = asyncio.get_running_loop()
+        await loop.sock_sendall(self._sock, msg.encode("utf-8"))

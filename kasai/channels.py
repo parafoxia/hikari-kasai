@@ -28,23 +28,12 @@
 
 from __future__ import annotations
 
-__productname__ = "hikari-kasai"
-__version__ = "0.4a"
-__description__ = "A bridge between Discord and Twitch chat."
-__url__ = "https://github.com/parafoxia/hikari-kasai"
-__docs__ = "https://hikari-kasai.readthedocs.io"
-__author__ = "Ethan Henderson"
-__author_email__ = "ethan.henderson.1998@gmail.com"
-__license__ = "BSD 3-Clause 'New' or 'Revised' License"
-__bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
-__ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
-__changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
+__all__ = ("Channel",)
 
-from kasai.bot import *
-from kasai.channels import *
-from kasai.errors import *
-from kasai.events import *
-from kasai.irc import *
-from kasai.messages import *
-from kasai.twitch import *
-from kasai.users import *
+import attr
+
+
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class Channel:
+    id: str
+    name: str

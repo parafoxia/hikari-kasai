@@ -12,18 +12,22 @@
 
 import os
 import sys
-
-import kasai
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
 
+with open(Path(__file__).parent.parent.parent / "kasai/__init__.py") as f:
+    for line in f:
+        if line.startswith("__version__"):
+            version = line.split(" = ")[-1].strip()
+
 project = "Kasai"
 copyright = "2022, Ethan Henderson"
 author = "Ethan Henderson"
-release = kasai.__version__
+release = version.strip('"')
 
 
 # -- General configuration ---------------------------------------------------

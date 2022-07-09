@@ -122,6 +122,8 @@ class GatewayBot(hikari.GatewayBot):
 
         Returns:
             :obj:`kasai.twitch.TwitchClient`
+
+        .. versionadded:: 0.4a
         """
 
         return self._twitch
@@ -140,6 +142,9 @@ class GatewayBot(hikari.GatewayBot):
         Raises:
             :obj:`kasai.errors.AlreadyConnected`:
                 Kasai is already connected to a Twitch channel.
+
+        .. versionchanged:: 0.4a
+            Now takes *channels as an argument.
         """
 
         if self._twitch._sock is not None:

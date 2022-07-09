@@ -84,6 +84,8 @@ class TwitchClient:
 
         Returns:
             :obj:`list` [:obj:`str`]
+
+        .. versionadded:: 0.5a
         """
 
         return self._channels
@@ -136,6 +138,8 @@ class TwitchClient:
         Raises:
             :obj:`kasai.errors.NotConnected`:
                 The client is not connected to Twitch.
+
+        .. versionadded:: 0.4a
         """
 
         if self._sock is None:
@@ -159,6 +163,8 @@ class TwitchClient:
         Raises:
             :obj:`kasai.errors.NotConnected`:
                 The client is not connected to Twitch.
+
+        .. versionadded:: 0.4a
         """
 
         if self._sock is None:

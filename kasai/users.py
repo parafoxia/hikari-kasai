@@ -58,6 +58,8 @@ class User:
         This does not necessarily represent a global user. The values
         of some attributes are dependent on context, often the channel
         the user was in when they sent a message.
+
+    .. versionadded:: 0.4a
     """
 
     id: str

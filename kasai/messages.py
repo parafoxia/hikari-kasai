@@ -46,6 +46,8 @@ class PrivMessage:
     """A dataclass representing a PRIVMSG message. All attributes must
     be passed to the constructor on creation, though you should never
     need to create this yourself.
+
+    .. versionadded:: 0.4a
     """
 
     id: str
@@ -115,6 +117,8 @@ class JoinMessage:
     """A dataclass representing a JOIN message. All attributes must be
     passed to the constructor on creation, though you should never need
     to create this yourself.
+
+    .. versionadded:: 0.5a
     """
 
     channel_name: str
@@ -144,6 +148,8 @@ class PartMessage:
     """A dataclass representing a PART message. All attributes must be
     passed to the constructor on creation, though you should never need
     to create this yourself.
+
+    .. versionadded:: 0.5a
     """
 
     channel_name: str

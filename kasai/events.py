@@ -72,6 +72,8 @@ class PrivMessageCreateEvent(KasaiEvent):
         This event is not triggered when a bot sends a message. No
         events for this eventuality exist yet, but it will be a separate
         event called :code:`UserstateMessageCreateEvent`.
+
+    .. versionadded:: 0.4a
     """
 
     message: PrivMessage
@@ -114,6 +116,8 @@ class PingEvent(KasaiEvent):
     """A dataclass created whenever the client receives a PING message
     from the Twitch server. All instance attributes must be passed to
     the constructor on creation.
+
+    .. versionadded:: 0.5a
     """
 
 
@@ -123,6 +127,8 @@ class JoinEvent(KasaiEvent):
     """A dataclass created whenever the client joins a Twitch channel.
     All instance attributes must be passed to the constructor on
     creation.
+
+    .. versionadded:: 0.5a
     """
 
     message: JoinMessage
@@ -145,6 +151,8 @@ class PartEvent(KasaiEvent):
     """A dataclass created whenever the client parts a Twitch channel.
     All instance attributes must be passed to the constructor on
     creation.
+
+    .. versionadded:: 0.5a
     """
 
     message: PartMessage

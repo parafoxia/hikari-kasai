@@ -33,9 +33,7 @@ __all__ = ("GatewayBot", "GatewayApp", "LightbulbApp", "CrescentApp")
 import asyncio
 import logging
 import typing as t
-from hashlib import sha256
 from importlib.util import find_spec
-from time import time
 
 import hikari
 from pkg_resources import working_set
@@ -128,10 +126,6 @@ class GatewayBot(hikari.GatewayBot):
 
         return self._twitch
 
-    @staticmethod
-    def _unique_id() -> str:
-        return sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
-
     async def start_irc(self, *channels: str) -> None:
         """Create a websocket connection to Twitch's IRC servers and
         start listening for messages.
@@ -158,7 +152,6 @@ class GatewayBot(hikari.GatewayBot):
         await loop.sock_connect(self._twitch._sock, ("irc.chat.twitch.tv", 6667))
         _log.info("connected to Twitch")
 
-        self._twitch._nickname = self._unique_id()
         await loop.sock_sendall(
             self._twitch._sock,
             (

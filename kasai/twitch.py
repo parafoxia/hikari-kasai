@@ -33,6 +33,8 @@ __all__ = ("TwitchClient",)
 import asyncio
 import logging
 import socket
+from hashlib import sha256
+from time import time
 
 import kasai
 
@@ -60,7 +62,7 @@ class TwitchClient:
     def __init__(self, bot: kasai.GatewayBot, token: str) -> None:
         self.bot = bot
         self._token = token
-        self._nickname = ""
+        self._nickname = sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
 

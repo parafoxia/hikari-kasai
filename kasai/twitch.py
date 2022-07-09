@@ -91,23 +91,20 @@ class TwitchClient:
 
             if resp.startswith(b"PING"):
                 await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
-                continue
-
-            if b"ACK" in resp:
-                _log.debug("capabilities acknowledged")
+                self.bot.dispatch(kasai.PingEvent(app=self.bot))
                 continue
 
             if b"JOIN" in resp:
-                _log.info(f"joined channel")
+                jm = kasai.JoinMessage.new(data)
+                self.bot.dispatch(kasai.JoinEvent(message=jm, app=self.bot))
+                _log.info(f"joined {jm.channel_name}")
                 continue
 
             if b"PRIVMSG" not in resp:
                 continue
 
-            message = kasai.PrivMessage.new(data)
-            self.bot.dispatch(
-                kasai.PrivMessageCreateEvent(message=message, app=self.bot)
-            )
+            pm = kasai.PrivMessage.new(data)
+            self.bot.dispatch(kasai.PrivMessageCreateEvent(message=pm, app=self.bot))
 
     async def join(self, *channels: str) -> None:
         """Join a Twitch channel.

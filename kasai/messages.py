@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("PrivMessage",)
+__all__ = ("PrivMessage", "JoinMessage")
 
 import datetime as dt
 import re
@@ -38,7 +38,7 @@ import attr
 import kasai
 from kasai.users import UserType
 
-_MSG_PATTERN = re.compile(r":[^#]*([^ ]*) :(.*)")
+_PRIV_PATTERN = re.compile(r":[^#]*([^ ]*) :(.*)")
 
 
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
@@ -82,7 +82,7 @@ class PrivMessage:
         """
 
         tags, message = data.split(" ", maxsplit=1)
-        match = _MSG_PATTERN.match(message)
+        match = _PRIV_PATTERN.match(message)
         assert match
         channel, content = match.groups()
 
@@ -108,3 +108,32 @@ class PrivMessage:
             bits=int(attrs.get("bits", 0)),
             content=content,
         )
+
+
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class JoinMessage:
+    """A dataclass representing a JOIN message. All attributes must be
+    passed to the constructor on creation, though you should never need
+    to create this yourself.
+    """
+
+    channel_name: str
+    """The name of the channel which was joined."""
+
+    @classmethod
+    def new(cls, data: str) -> JoinMessage:
+        """Create a new instance from raw (decoded) message data.
+
+        .. note::
+            The message data *must* be decoded before being passed.
+
+        Args:
+            data:
+                The raw (decoded) message data.
+
+        Returns:
+            A new instance.
+        """
+
+        channel = data.split()[-1]
+        return cls(channel_name=channel)

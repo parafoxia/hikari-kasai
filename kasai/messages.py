@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("PrivMessage", "JoinMessage")
+__all__ = ("PrivMessage", "JoinMessage", "PartMessage")
 
 import datetime as dt
 import re
@@ -122,6 +122,35 @@ class JoinMessage:
 
     @classmethod
     def new(cls, data: str) -> JoinMessage:
+        """Create a new instance from raw (decoded) message data.
+
+        .. note::
+            The message data *must* be decoded before being passed.
+
+        Args:
+            data:
+                The raw (decoded) message data.
+
+        Returns:
+            A new instance.
+        """
+
+        channel = data.split()[-1]
+        return cls(channel_name=channel)
+
+
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class PartMessage:
+    """A dataclass representing a PART message. All attributes must be
+    passed to the constructor on creation, though you should never need
+    to create this yourself.
+    """
+
+    channel_name: str
+    """The name of the channel which was joined."""
+
+    @classmethod
+    def new(cls, data: str) -> PartMessage:
         """Create a new instance from raw (decoded) message data.
 
         .. note::

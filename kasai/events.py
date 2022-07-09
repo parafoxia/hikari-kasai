@@ -28,7 +28,13 @@
 
 from __future__ import annotations
 
-__all__ = ("KasaiEvent", "PrivMessageCreateEvent", "PingEvent", "JoinEvent")
+__all__ = (
+    "KasaiEvent",
+    "PrivMessageCreateEvent",
+    "PingEvent",
+    "JoinEvent",
+    "PartEvent",
+)
 
 import typing as t
 
@@ -41,7 +47,7 @@ import kasai
 if t.TYPE_CHECKING:
     from hikari import traits
 
-    from kasai.messages import JoinMessage, PrivMessage
+    from kasai.messages import JoinMessage, PartMessage, PrivMessage
 
 
 @attr_extensions.with_copy
@@ -125,6 +131,28 @@ class JoinEvent(KasaiEvent):
     @property
     def channel_name(self) -> str:
         """The name of the channel which was joined.
+
+        Returns:
+            :obj:`str`
+        """
+
+        return self.message.channel_name
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class PartEvent(KasaiEvent):
+    """A dataclass created whenever the client parts a Twitch channel.
+    All instance attributes must be passed to the constructor on
+    creation.
+    """
+
+    message: PartMessage
+    """A representation of a PART message."""
+
+    @property
+    def channel_name(self) -> str:
+        """The name of the channel which was parted.
 
         Returns:
             :obj:`str`

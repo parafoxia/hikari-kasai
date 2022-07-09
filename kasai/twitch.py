@@ -95,9 +95,15 @@ class TwitchClient:
                 continue
 
             if b"JOIN" in resp:
-                jm = kasai.JoinMessage.new(data)
-                self.bot.dispatch(kasai.JoinEvent(message=jm, app=self.bot))
-                _log.info(f"joined {jm.channel_name}")
+                join = kasai.JoinMessage.new(data)
+                self.bot.dispatch(kasai.JoinEvent(message=join, app=self.bot))
+                _log.info(f"joined {join.channel_name}")
+                continue
+
+            if b"PART" in resp:
+                part = kasai.PartMessage.new(data)
+                self.bot.dispatch(kasai.PartEvent(message=part, app=self.bot))
+                _log.info(f"parted {part.channel_name}")
                 continue
 
             if b"PRIVMSG" not in resp:

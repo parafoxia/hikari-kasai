@@ -57,12 +57,13 @@ class TwitchClient:
             The bot instance.
     """
 
-    __slots__ = ("bot", "_token", "_nickname", "_sock", "_task")
+    __slots__ = ("bot", "_token", "_nickname", "_channels", "_sock", "_task")
 
     def __init__(self, bot: kasai.GatewayBot, token: str) -> None:
         self.bot = bot
         self._token = token
         self._nickname = sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
+        self._channels: list[str] = []
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
 
@@ -76,6 +77,16 @@ class TwitchClient:
         """
 
         return self._sock is not None
+
+    @property
+    def channels(self) -> list[str]:
+        """A list of channels the client is connected to.
+
+        Returns:
+            :obj:`list` [:obj:`str`]
+        """
+
+        return self._channels
 
     def _create_sock(self) -> None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -97,12 +108,14 @@ class TwitchClient:
             if b"JOIN" in resp:
                 join = kasai.JoinMessage.new(data)
                 self.bot.dispatch(kasai.JoinEvent(message=join, app=self.bot))
+                self._channels.append(join.channel_name)
                 _log.info(f"joined {join.channel_name}")
                 continue
 
             if b"PART" in resp:
                 part = kasai.PartMessage.new(data)
                 self.bot.dispatch(kasai.PartEvent(message=part, app=self.bot))
+                self._channels.remove(part.channel_name)
                 _log.info(f"parted {part.channel_name}")
                 continue
 

@@ -182,8 +182,7 @@ class GatewayBot(hikari.GatewayBot):
         if not self._twitch._task:
             return
 
-        loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._twitch._sock, b"PART\r\n")
+        await self._twitch.part(*self._twitch._channels)
         self._twitch._sock.close()
         self._twitch._sock = None
         if not self._twitch._task.cancelled():

@@ -1,6 +1,6 @@
-# hikari-kasai
+# Kasai
 
-A bridge between Discord and Twitch chat.
+Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.
 
 ## Installation
 

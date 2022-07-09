@@ -52,7 +52,7 @@ class GatewayBot(hikari.GatewayBot):
 
     If you wish to use a command handler, you can create a subclass
     which inherits from this class and your preferred command handler's
-    bot class. Note that if you do this, Kasai's GatewayApp *must* be
+    bot class. Note that if you do this, Kasai's GatewayBot *must* be
     inherited first.
 
     For example:
@@ -71,50 +71,30 @@ class GatewayBot(hikari.GatewayBot):
             Your Twitch IRC access token.
 
     Keyword Args:
+        banner:
+            The banner to be displayed on boot (this is passed directly
+            to the :obj:`~hikari.impl.bot.GatewayBot` initialiser). This
+            defaults to "kasai".
         **kwargs:
             Additional keyword arguments to be passed to
             :obj:`~hikari.impl.bot.GatewayBot`.
+
+    .. versionchanged:: 0.6a
+        (1) This no longer takes ``channel`` and ``nickname`` arguments.
+        (2) You can now choose the banner that will be displayed on
+        boot.
     """
 
     def __init__(
         self,
         token: str,
         irc_token: str,
-        channel: str | None = None,
-        nickname: str | None = None,
-        /,
+        *,
+        banner: str = "kasai",
         **kwargs: t.Any,
     ) -> None:
-        if channel:
-            ux.depr_warn(
-                "channel",
-                "v0.6a",
-                (
-                    "the 'channel' argument should now be passed to "
-                    "GatewayBot.start_irc — it no longer works here"
-                ),
-            )
-
-        if nickname:
-            ux.depr_warn(
-                "nickname", "v0.6a", "the 'nickname' argument is no longer in use"
-            )
-
-        super().__init__(token, banner="kasai", **kwargs)
+        super().__init__(token, banner=banner, **kwargs)
         self._twitch = kasai.TwitchClient(self, irc_token)
-
-    @property
-    def irc(self) -> kasai.TwitchClient:
-        ux.depr_warn(
-            "GatewayBot.irc",
-            "0.6a",
-            (
-                "use `GatewayBot.twitch` instead. The old IRC client has been replaced "
-                "with a new Twitch one, which means that there are some breaking "
-                "changes that could not be deprecated"
-            ),
-        )
-        return self._twitch
 
     @property
     def twitch(self) -> kasai.TwitchClient:
@@ -144,7 +124,7 @@ class GatewayBot(hikari.GatewayBot):
                 Kasai is already connected to a Twitch channel.
 
         .. versionchanged:: 0.4a
-            Now takes *channels as an argument.
+            This now takes channels as an argument.
         """
 
         if self._twitch._sock is not None:

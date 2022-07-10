@@ -46,8 +46,6 @@ class PrivMessage:
     """A dataclass representing a PRIVMSG message. All attributes must
     be passed to the constructor on creation, though you should never
     need to create this yourself.
-
-    .. versionadded:: 0.4a
     """
 
     id: str
@@ -75,12 +73,14 @@ class PrivMessage:
         .. note::
             The message data *must* be decoded before being passed.
 
-        Args:
-            data:
-                The raw (decoded) message data.
+        Parameters
+        ----------
+        data : builtins.str
+            The raw (decoded) message data.
 
-        Returns:
-            A new instance.
+        Returns
+        -------
+        kasai.messages.PrivMessage
         """
 
         tags, message = data.split(" ", maxsplit=1)
@@ -117,8 +117,6 @@ class JoinMessage:
     """A dataclass representing a JOIN message. All attributes must be
     passed to the constructor on creation, though you should never need
     to create this yourself.
-
-    .. versionadded:: 0.5a
     """
 
     channel_name: str
@@ -131,12 +129,14 @@ class JoinMessage:
         .. note::
             The message data *must* be decoded before being passed.
 
-        Args:
-            data:
-                The raw (decoded) message data.
+        Parameters
+        ----------
+        data : builtins.str
+            The raw (decoded) message data.
 
-        Returns:
-            A new instance.
+        Returns
+        -------
+        kasai.messages.JoinMessage
         """
 
         channel = data.split()[-1]
@@ -148,8 +148,6 @@ class PartMessage:
     """A dataclass representing a PART message. All attributes must be
     passed to the constructor on creation, though you should never need
     to create this yourself.
-
-    .. versionadded:: 0.5a
     """
 
     channel_name: str
@@ -162,12 +160,14 @@ class PartMessage:
         .. note::
             The message data *must* be decoded before being passed.
 
-        Args:
-            data:
-                The raw (decoded) message data.
+        Parameters
+        ----------
+        data : builtins.str
+            The raw (decoded) message data.
 
-        Returns:
-            A new instance.
+        Returns
+        -------
+        kasai.messages.PartMessage
         """
 
         channel = data.split()[-1]

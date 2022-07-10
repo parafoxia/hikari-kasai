@@ -71,9 +71,7 @@ class PrivMessageCreateEvent(KasaiEvent):
     .. important::
         This event is not triggered when a bot sends a message. No
         events for this eventuality exist yet, but it will be a separate
-        event called :code:`UserstateMessageCreateEvent`.
-
-    .. versionadded:: 0.4a
+        event called `UserstateMessageCreateEvent`.
     """
 
     message: PrivMessage
@@ -83,8 +81,9 @@ class PrivMessageCreateEvent(KasaiEvent):
     def author(self) -> kasai.User:
         """The message's author.
 
-        Returns:
-            :obj:`kasai.users.User`
+        Returns
+        -------
+        kasai.users.User
         """
 
         return self.message.author
@@ -93,8 +92,9 @@ class PrivMessageCreateEvent(KasaiEvent):
     def channel(self) -> kasai.Channel:
         """The channel the message was sent to.
 
-        Returns:
-            :obj:`kasai.channels.Channel`
+        Returns
+        -------
+        kasai.channels.Channel
         """
 
         return self.message.channel
@@ -103,8 +103,9 @@ class PrivMessageCreateEvent(KasaiEvent):
     def content(self) -> str:
         """The content of the message.
 
-        Returns:
-            :obj:`str`
+        Returns
+        -------
+        builtins.str
         """
 
         return self.message.content
@@ -116,8 +117,6 @@ class PingEvent(KasaiEvent):
     """A dataclass created whenever the client receives a PING message
     from the Twitch server. All instance attributes must be passed to
     the constructor on creation.
-
-    .. versionadded:: 0.5a
     """
 
 
@@ -127,8 +126,6 @@ class JoinEvent(KasaiEvent):
     """A dataclass created whenever the client joins a Twitch channel.
     All instance attributes must be passed to the constructor on
     creation.
-
-    .. versionadded:: 0.5a
     """
 
     message: JoinMessage
@@ -138,8 +135,9 @@ class JoinEvent(KasaiEvent):
     def channel_name(self) -> str:
         """The name of the channel which was joined.
 
-        Returns:
-            :obj:`str`
+        Returns
+        -------
+        builtins.str
         """
 
         return self.message.channel_name
@@ -151,8 +149,6 @@ class PartEvent(KasaiEvent):
     """A dataclass created whenever the client parts a Twitch channel.
     All instance attributes must be passed to the constructor on
     creation.
-
-    .. versionadded:: 0.5a
     """
 
     message: PartMessage
@@ -162,8 +158,9 @@ class PartEvent(KasaiEvent):
     def channel_name(self) -> str:
         """The name of the channel which was parted.
 
-        Returns:
-            :obj:`str`
+        Returns
+        -------
+        builtins.str
         """
 
         return self.message.channel_name

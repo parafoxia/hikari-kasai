@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import sys
 
-__all__ = ("BANNER", "display_splash", "deprecated")
+__all__ = ("display_splash", "deprecated", "depr_warn")
 
 import logging
 import typing as t

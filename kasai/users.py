@@ -58,8 +58,6 @@ class User:
         This does not necessarily represent a global user. The values
         of some attributes are dependent on context, often the channel
         the user was in when they sent a message.
-
-    .. versionadded:: 0.4a
     """
 
     id: str
@@ -93,8 +91,9 @@ class User:
         """The user's username. This is always their display name in
         all lower case.
 
-        Returns:
-            :obj:`str`
+        Returns
+        -------
+        builtins.str
         """
 
         return self.display_name.lower()
@@ -104,8 +103,9 @@ class User:
         """An alias for those who can spell correctly. This is an
         integer representation of the colour's hex code.
 
-        Return:
-            :obj:`int`
+        Returns
+        -------
+        builtins.int
         """
 
         return self.color

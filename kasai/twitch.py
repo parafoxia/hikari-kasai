@@ -46,21 +46,20 @@ class TwitchClient:
     :obj:`kasai.bot.GatewayBot.twitch`, and should never need to be
     manually instantiated.
 
-    Args:
-        bot:
-            The bot instance.
-        token:
-            Your Twitch IRC token
-
-    Attributes:
-        bot (:obj:`kasai.bot.GatewayBot`):
-            The bot instance.
+    Parameters
+    ----------
+    bot : kasai.bot.GatewayBot
+        The Discord bot instance.
+    token : builtins.str
+        Your Twitch IRC token
     """
 
     __slots__ = ("bot", "_token", "_nickname", "_channels", "_sock", "_task")
 
     def __init__(self, bot: kasai.GatewayBot, token: str) -> None:
         self.bot = bot
+        """The Discord bot instance."""
+
         self._token = token
         self._nickname = sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
         self._channels: list[str] = []
@@ -72,8 +71,9 @@ class TwitchClient:
         """Whether the websocket is open. This does not necessarily mean
         it's connected to a channel.
 
-        Returns:
-            :obj:`bool`
+        Returns
+        -------
+        builtins.bool
         """
 
         return self._sock is not None
@@ -82,10 +82,9 @@ class TwitchClient:
     def channels(self) -> list[str]:
         """A list of channels the client is connected to.
 
-        Returns:
-            :obj:`list` [:obj:`str`]
-
-        .. versionadded:: 0.5a
+        Returns
+        -------
+        builtins.list[builtins.str]
         """
 
         return self._channels
@@ -130,16 +129,16 @@ class TwitchClient:
     async def join(self, *channels: str) -> None:
         """Join a Twitch channel.
 
-        Args:
-            *channels:
-                The channels to join. This can be empty, in which case,
-                nothing will happen.
+        Parameters
+        ----------
+        *channels : str
+            The channels to join. This can be empty, in which case,
+            nothing will happen.
 
-        Raises:
-            :obj:`kasai.errors.NotConnected`:
-                The client is not connected to Twitch.
-
-        .. versionadded:: 0.4a
+        Raises
+        ------
+        kasai.errors.NotConnected
+            The client is not connected to Twitch.
         """
 
         if self._sock is None:
@@ -155,16 +154,16 @@ class TwitchClient:
     async def part(self, *channels: str) -> None:
         """Part (or leave) a Twitch channel.
 
-        Args:
-            *channels:
-                The channels to part. This can be empty, in which case,
-                nothing will happen.
+        Parameters
+        ----------
+        *channels : builtins.str
+            The channels to part. This can be empty, in which case,
+            nothing will happen.
 
-        Raises:
-            :obj:`kasai.errors.NotConnected`:
-                The client is not connected to Twitch.
-
-        .. versionadded:: 0.4a
+        Raises
+        ------
+        kasai.errors.NotConnected
+            The client is not connected to Twitch.
         """
 
         if self._sock is None:
@@ -178,18 +177,20 @@ class TwitchClient:
         """Send a message to a given channel's chat. The client must
         have joined that channel to send a message.
 
-        Args:
-            channel:
-                The channel to send the message to. This must be
-                prefixed with a hash (#).
-            content:
-                The content of the message. The maximum allowed message
-                length varies on a number of factors, but generally,
-                messages should not be longer than about 400 characters.
+        Parameters
+        ----------
+        channel : builtins.str
+            The channel to send the message to. This must be prefixed
+            with a hash (#).
+        contents : builtins.str
+            The content of the message. The maximum allowed message
+            length varies on a number of factors, but generally,
+            messages should not be longer than about 400 characters.
 
-        Raises:
-            :obj:`kasai.errors.NotConnected`:
-                The client is not connected to a Twitch channel.
+        Raises
+        ------
+        kasai.errors.NotConnected
+            The client is not connected to a Twitch channel.
         """
 
         if self._sock is None:

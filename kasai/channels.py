@@ -38,8 +38,6 @@ class Channel:
     """A dataclass representing a Twitch channel. All attributes must
     be passed to the constructor on creation, though you should never
     need to create this yourself.
-
-    .. versionadded:: 0.4a
     """
 
     id: str

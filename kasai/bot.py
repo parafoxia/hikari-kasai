@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("GatewayBot", "GatewayApp", "LightbulbApp", "CrescentApp")
+__all__ = ("GatewayBot",)
 
 import asyncio
 import logging
@@ -47,8 +47,8 @@ _log = logging.getLogger(__name__)
 
 
 class GatewayBot(hikari.GatewayBot):
-    """A subclass of :obj:`~hikari.impl.bot.GatewayBot` which includes
-    Twitch functionality.
+    """A subclass of `hikari.impl.bot.GatewayBot` which includes Twitch
+    functionality.
 
     If you wish to use a command handler, you can create a subclass
     which inherits from this class and your preferred command handler's
@@ -57,31 +57,31 @@ class GatewayBot(hikari.GatewayBot):
 
     For example:
 
-    .. code-block:: python
+    ```py
+    class Bot(kasai.GatewayBot, lightbulb.BotApp):
+        ...
 
-        class Bot(kasai.GatewayBot, lightbulb.BotApp):
-            ...
+    bot = Bot(...)
+    ```
 
-        bot = Bot(...)
+    Parameters
+    ----------
+    token : builtins.str
+        Your Discord bot's token.
+    irc_token : builtins.str
+        Your Twitch IRC access token.
 
-    Args:
-        token:
-            Your Discord bot's token.
-        irc_token:
-            Your Twitch IRC access token.
-
-    Keyword Args:
-        banner:
-            The banner to be displayed on boot (this is passed directly
-            to the :obj:`~hikari.impl.bot.GatewayBot` initialiser). This
-            defaults to "kasai".
-        **kwargs:
-            Additional keyword arguments to be passed to
-            :obj:`~hikari.impl.bot.GatewayBot`.
+    Other Parameters
+    ----------------
+    banner : str
+        The banner to be displayed on boot (this is passed directly to
+        the superclass initialiser). This defaults to "kasai".
+    **kwargs : Any
+        Additional keyword arguments to be passed to the superclass.
 
     .. versionchanged:: 0.6a
-        (1) This no longer takes ``channel`` and ``nickname`` arguments.
-        (2) You can now choose the banner that will be displayed on
+        * This no longer takes `channel` and `nickname` arguments.
+        * You can now choose the banner that will be displayed on
         boot.
     """
 
@@ -100,10 +100,9 @@ class GatewayBot(hikari.GatewayBot):
     def twitch(self) -> kasai.TwitchClient:
         """The Twitch IRC client interface.
 
-        Returns:
-            :obj:`kasai.twitch.TwitchClient`
-
-        .. versionadded:: 0.4a
+        Returns
+        -------
+        kasai.twitch.TwitchClient
         """
 
         return self._twitch
@@ -112,19 +111,17 @@ class GatewayBot(hikari.GatewayBot):
         """Create a websocket connection to Twitch's IRC servers and
         start listening for messages.
 
-        Args:
-            *channels:
-                The channels to join once connected. This can be empty,
-                in which case you will need to manually join your
-                channel(s) later. All channels must be prefixed with a
-                hash (#).
+        Parameters
+        ----------
+        *channels : builtins.str
+            The channels to join once connected. This can be empty, in
+            which case you will need to manually join your channel(s)
+            later. All channels must be prefixed with a hash (#).
 
-        Raises:
-            :obj:`kasai.errors.AlreadyConnected`:
-                Kasai is already connected to a Twitch channel.
-
-        .. versionchanged:: 0.4a
-            This now takes channels as an argument.
+        Raises
+        ------
+        kasai.errors.AlreadyConnected
+            Kasai is already connected to a Twitch channel.
         """
 
         if self._twitch._sock is not None:
@@ -156,9 +153,10 @@ class GatewayBot(hikari.GatewayBot):
         """Stop listening for messages and close the connection to your
         Twitch channel(s).
 
-        Raises:
-            :obj:`kasai.errors.NotConnected`:
-                Kasai is not currently connected to a Twitch channel.
+        Raises
+        ------
+        kasai.errors.NotConnected
+            Kasai is not currently connected to a Twitch channel.
         """
 
         if self._twitch._sock is None:
@@ -219,54 +217,54 @@ class GatewayBot(hikari.GatewayBot):
         )
 
 
-class GatewayApp(GatewayBot):
-    def __init__(
-        self,
-        token: str,
-        irc_token: str,
-        **kwargs: t.Any,
-    ) -> None:
-        super().__init__(token, irc_token, **kwargs)
-        ux.depr_warn("kasai.GatewayApp", "0.7a", "use 'kasai.GatewayBot' instead")
+# class GatewayApp(GatewayBot):
+#     def __init__(
+#         self,
+#         token: str,
+#         irc_token: str,
+#         **kwargs: t.Any,
+#     ) -> None:
+#         super().__init__(token, irc_token, **kwargs)
+#         ux.depr_warn("kasai.GatewayApp", "0.7a", "use 'kasai.GatewayBot' instead")
 
 
-if "hikari-lightbulb" in _libs:
-    import lightbulb
+# if "hikari-lightbulb" in _libs:
+#     import lightbulb
 
-    class LightbulbApp(GatewayBot, lightbulb.BotApp):
-        def __init__(
-            self,
-            token: str,
-            irc_token: str,
-            **kwargs: t.Any,
-        ) -> None:
-            super().__init__(token, irc_token, **kwargs)
-            ux.depr_warn(
-                "kasai.LightbulbApp",
-                "0.7a",
-                (
-                    "you will need to subclass to use command handlers in future; "
-                    "refer to README for more information"
-                ),
-            )
+#     class LightbulbApp(GatewayBot, lightbulb.BotApp):
+#         def __init__(
+#             self,
+#             token: str,
+#             irc_token: str,
+#             **kwargs: t.Any,
+#         ) -> None:
+#             super().__init__(token, irc_token, **kwargs)
+#             ux.depr_warn(
+#                 "kasai.LightbulbApp",
+#                 "0.7a",
+#                 (
+#                     "you will need to subclass to use command handlers in future; "
+#                     "refer to README for more information"
+#                 ),
+#             )
 
 
-if "hikari-crescent" in _libs:
-    import crescent
+# if "hikari-crescent" in _libs:
+#     import crescent
 
-    class CrescentApp(GatewayBot, crescent.Bot):
-        def __init__(
-            self,
-            token: str,
-            irc_token: str,
-            **kwargs: t.Any,
-        ) -> None:
-            super().__init__(token, irc_token, **kwargs)
-            ux.depr_warn(
-                "kasai.CrescentApp",
-                "0.7a",
-                (
-                    "you will need to subclass to use command handlers in future; "
-                    "refer to README for more information"
-                ),
-            )
+#     class CrescentApp(GatewayBot, crescent.Bot):
+#         def __init__(
+#             self,
+#             token: str,
+#             irc_token: str,
+#             **kwargs: t.Any,
+#         ) -> None:
+#             super().__init__(token, irc_token, **kwargs)
+#             ux.depr_warn(
+#                 "kasai.CrescentApp",
+#                 "0.7a",
+#                 (
+#                     "you will need to subclass to use command handlers in future; "
+#                     "refer to README for more information"
+#                 ),
+#             )

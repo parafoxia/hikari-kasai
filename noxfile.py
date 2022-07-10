@@ -178,4 +178,13 @@ def dependencies(session: nox.Session) -> None:
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
     session.install(*fetch_installs("Docs"), "-r", "requirements/base.txt")
-    session.run("pdoc3", "kasai", "-o", "docs", "--html", "--force", "--template-dir", "docs/templates")
+    session.run(
+        "pdoc3",
+        "kasai",
+        "-o",
+        "docs",
+        "--html",
+        "--force",
+        "--template-dir",
+        "docs/templates",
+    )

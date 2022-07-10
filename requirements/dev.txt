@@ -6,8 +6,7 @@
 nox==2022.1.7
 
 # Docs
-furo
-sphinx>=5,<6
+pdoc3>=0.10
 
 # Formatting
 black[jupyter]~=22.6.0
@@ -18,8 +17,6 @@ isort~=5.10.0
 
 # Typing
 mypy==0.961
-hikari-lightbulb
-hikari-crescent
 types-attrs
 types-setuptools
 
@@ -37,7 +34,7 @@ pytest-asyncio~=0.18.1
 requests>=2.27,<3
 
 # Safety
-safety>=2.0.0,<3
+safety>=2.0,<3
 
 # Security
 bandit~=1.7.2

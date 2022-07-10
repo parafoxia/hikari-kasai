@@ -120,6 +120,16 @@ class TwitchClient:
                 _log.info(f"parted {part.channel_name}")
                 continue
 
+            if b"CLEARCHAT" in resp:
+                mod = kasai.ModActionMessage.new(data)
+                if mod.command.value == 0:
+                    self.bot.dispatch(kasai.ClearEvent(message=mod, app=self.bot))
+                elif mod.command.value == 1:
+                    self.bot.dispatch(kasai.BanEvent(message=mod, app=self.bot))
+                elif mod.command.value == 2:
+                    self.bot.dispatch(kasai.TimeoutEvent(message=mod, app=self.bot))
+                continue
+
             if b"PRIVMSG" not in resp:
                 continue
 

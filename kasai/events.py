@@ -34,6 +34,9 @@ __all__ = (
     "PingEvent",
     "JoinEvent",
     "PartEvent",
+    "ClearEvent",
+    "BanEvent",
+    "TimeoutEvent",
 )
 
 import typing as t
@@ -47,7 +50,7 @@ import kasai
 if t.TYPE_CHECKING:
     from hikari import traits
 
-    from kasai.messages import JoinMessage, PartMessage, PrivMessage
+    from kasai.messages import JoinMessage, ModActionMessage, PartMessage, PrivMessage
 
 
 @attr_extensions.with_copy
@@ -162,3 +165,74 @@ class PartEvent(KasaiEvent):
         """
 
         return self.message.channel_name
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class ClearEvent(KasaiEvent):
+    """A dataclass created whenever a clear command is sent to the
+    Twitch channel. All instance attributes must be passed to the
+    constructor on creation.
+    """
+
+    message: ModActionMessage
+    """A representation of a CLEARCHAT message."""
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class BanEvent(KasaiEvent):
+    """A dataclass created whenever a ban command is sent to the Twitch
+    channel. All instance attributes must be passed to the constructor
+    on creation.
+    """
+
+    message: ModActionMessage
+    """A representation of a CLEARCHAT message."""
+
+    @property
+    def target_id(self) -> str:
+        """The target user's ID.
+
+        Returns
+        -------
+        builtins.str
+        """
+
+        assert self.message.target_id is not None
+        return self.message.target_id
+
+
+@attr_extensions.with_copy
+@attr.define(kw_only=True, weakref_slot=False)
+class TimeoutEvent(KasaiEvent):
+    """A dataclass created whenever a timeout command is sent to the
+    Twitch channel. All instance attributes must be passed to the
+    constructor on creation.
+    """
+
+    message: ModActionMessage
+    """A representation of a CLEARCHAT message."""
+
+    @property
+    def target_id(self) -> str:
+        """The target user's ID.
+
+        Returns
+        -------
+        builtins.str
+        """
+
+        assert self.message.target_id is not None
+        return self.message.target_id
+
+    @property
+    def duration(self) -> int:
+        """The timeout duration.
+
+        Returns
+        -------
+        builtins.int
+        """
+
+        return self.message.duration

@@ -28,9 +28,10 @@
 
 from __future__ import annotations
 
-__all__ = ("PrivMessage", "JoinMessage", "PartMessage")
+__all__ = ("PrivMessage", "JoinMessage", "PartMessage", "ModActionMessage")
 
 import datetime as dt
+import enum
 import re
 
 import attr
@@ -83,7 +84,7 @@ class PrivMessage:
         kasai.messages.PrivMessage
         """
 
-        tags, message = data.split(" ", maxsplit=1)
+        tags, message = data[1:].split(" ", maxsplit=1)
         match = _PRIV_PATTERN.match(message)
         assert match
         channel, content = match.groups()
@@ -172,3 +173,88 @@ class PartMessage:
 
         channel = data.split()[-1]
         return cls(channel_name=channel)
+
+
+class ModCommandType(enum.Enum):
+    CLEAR = 0
+    BAN = 1
+    TIMEOUT = 2
+
+
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class ModActionMessage:
+    """A dataclass representing a CLEARCHAT message. All attributes must
+    be passed to the constructor on creation, though you should never
+    need to create this yourself.
+
+    .. important::
+        This is triggered whenever a mod in your chat executes one of
+        the following moderation actions:
+
+        * /clear
+        * /ban
+        * /timeout
+
+        This is always sent as a CLEARCHAT message regardless of the
+        action taken. Action reasons are also not collected by this
+        class.
+    """
+
+    target_id: str | None
+    """The target user's ID. This is `None` if a clear command was
+    sent."""
+
+    channel: kasai.Channel
+    """The channel the command was executed in."""
+
+    created_at: dt.datetime
+    """The time the command was executed."""
+
+    command: ModCommandType
+    """The command that was executed."""
+
+    duration: int
+    """The duration of the action. This is only non-zero if the command
+    was a timeout, in which case it will be the number of seconds the
+    user is timed out for."""
+
+    @classmethod
+    def new(cls, data: str) -> ModActionMessage:
+        """Create a new instance from raw (decoded) message data.
+
+        .. note::
+            The message data *must* be decoded before being passed.
+
+        Parameters
+        ----------
+        data : builtins.str
+            The raw (decoded) message data.
+
+        Returns
+        -------
+        kasai.messages.ModActionMessage
+        """
+
+        tags, message = data[1:].split(" ", maxsplit=1)
+        channel = message.split()[2]
+
+        attrs = {(kv := attr.split("="))[0]: kv[1] for attr in tags.split(";")}
+        keys = attrs.keys()
+
+        if "ban-duration" in keys:
+            cmd = ModCommandType.TIMEOUT
+        elif "target-user-id" in keys:
+            cmd = ModCommandType.BAN
+        else:
+            cmd = ModCommandType.CLEAR
+
+        return cls(
+            target_id=attrs.get("target-user-id", None),
+            channel=kasai.Channel(
+                id=attrs["room-id"],
+                name=channel,
+            ),
+            created_at=dt.datetime.fromtimestamp(int(attrs["tmi-sent-ts"]) / 1000),
+            command=cmd,
+            duration=int(attrs.get("ban-duration", 0)),
+        )

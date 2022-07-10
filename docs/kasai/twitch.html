@@ -148,6 +148,16 @@ class TwitchClient:
                 _log.info(f&#34;parted {part.channel_name}&#34;)
                 continue
 
+            if b&#34;CLEARCHAT&#34; in resp:
+                mod = kasai.ModActionMessage.new(data)
+                if mod.command.value == 0:
+                    self.bot.dispatch(kasai.ClearEvent(message=mod, app=self.bot))
+                elif mod.command.value == 1:
+                    self.bot.dispatch(kasai.BanEvent(message=mod, app=self.bot))
+                elif mod.command.value == 2:
+                    self.bot.dispatch(kasai.TimeoutEvent(message=mod, app=self.bot))
+                continue
+
             if b&#34;PRIVMSG&#34; not in resp:
                 continue
 
@@ -337,6 +347,16 @@ manually instantiated.</p>
                 self.bot.dispatch(kasai.PartEvent(message=part, app=self.bot))
                 self._channels.remove(part.channel_name)
                 _log.info(f&#34;parted {part.channel_name}&#34;)
+                continue
+
+            if b&#34;CLEARCHAT&#34; in resp:
+                mod = kasai.ModActionMessage.new(data)
+                if mod.command.value == 0:
+                    self.bot.dispatch(kasai.ClearEvent(message=mod, app=self.bot))
+                elif mod.command.value == 1:
+                    self.bot.dispatch(kasai.BanEvent(message=mod, app=self.bot))
+                elif mod.command.value == 2:
+                    self.bot.dispatch(kasai.TimeoutEvent(message=mod, app=self.bot))
                 continue
 
             if b&#34;PRIVMSG&#34; not in resp:

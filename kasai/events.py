@@ -69,9 +69,7 @@ class PrivMessageCreateEvent(KasaiEvent):
     constructor on creation.
 
     .. important::
-        This event is not triggered when a bot sends a message. No
-        events for this eventuality exist yet, but it will be a separate
-        event called `UserstateMessageCreateEvent`.
+        This event is not triggered when your bot sends a message.
     """
 
     message: PrivMessage

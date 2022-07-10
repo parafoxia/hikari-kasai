@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="${html_lang}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
@@ -79,7 +79,7 @@
             return;
         }
 
-        const fuzziness = 1;
+        const fuzziness = ${int(lunr_search.get('fuzziness', 1))};
         if (fuzziness) {
             query = query.split(/\s+/)
                     .map(str => str.includes('~') ? str : str + '~' + fuzziness).join(' ');
@@ -104,6 +104,7 @@
                             return position.map(([start, length]) => {
                                 const PAD_CHARS = 30;
                                 const end = start + length;
+                                ## TODO: merge overlapping matches
                                 return [
                                     start,
                                     (start - PAD_CHARS > 0 ? '…' : '') +

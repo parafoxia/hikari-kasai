@@ -32,6 +32,8 @@
     font-size: 1em;
     padding: 6px 9px 5px 9px;
     border: 1px solid silver;
+    background: #303030;
+    color: #fff;
   }
   % endif
 

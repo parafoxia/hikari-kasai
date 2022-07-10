@@ -1,5 +1,12 @@
 # Kasai
 
+[![PyPi version](https://img.shields.io/pypi/v/hikari-kasai.svg)](https://pypi.python.org/pypi/hikari-kasai/)
+[![PyPI - Status](https://img.shields.io/pypi/status/hikari-kasai)](https://pypi.python.org/pypi/hikari-kasai/)
+[![Downloads](https://pepy.tech/badge/hikari-kasai)](https://pepy.tech/project/hikari-kasai)
+[![GitHub last commit](https://img.shields.io/github/last-commit/parafoxia/hikari-kasai)](https://github.com/parafoxia/hikari-kasai)
+[![Docs](https://img.shields.io/badge/docs-pdoc-success)](https://parafoxia.github.io/hikari-kasai/kasai/)
+[![License](https://img.shields.io/github/license/parafoxia/hikari-kasai.svg)](https://github.com/parafoxia/hikari-kasai/blob/main/LICENSE)
+
 Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.
 
 ## Installation

@@ -173,3 +173,9 @@ def security(session: nox.Session) -> None:
 def dependencies(session: nox.Session) -> None:
     session.install(*fetch_installs("Dependencies"))
     session.run("deputil", "update", "requirements")
+
+
+@nox.session(reuse_venv=True)
+def docs(session: nox.Session) -> None:
+    session.install(*fetch_installs("Docs"), "-r", "requirements/base.txt")
+    session.run("pdoc3", "kasai", "--html", "--force", "-o", "docs")

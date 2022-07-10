@@ -46,7 +46,10 @@ readme = Path(__file__).parent.parent / "README.md"
 
 # This is only needed for documentation purposes.
 if readme.is_file():
-    __doc__ = readme.read_text()[9:]
+    __doc__ = (
+        f"**Welcome to the documentation for Kasai v{__version__}!**\n\n"
+        + readme.read_text()[9:]
+    )
 
 from kasai.bot import *
 from kasai.channels import *

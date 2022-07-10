@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>kasai API documentation</title>
-<meta name="description" content="Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms …" />
+<meta name="description" content="**Welcome to the documentation for Kasai v0.6a!** …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,6 +22,7 @@
 <h1 class="title">Package <code>kasai</code></h1>
 </header>
 <section id="section-intro">
+<p><strong>Welcome to the documentation for Kasai v0.6a!</strong></p>
 <p>Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.</p>
 <h2 id="installation">Installation</h2>
 <p>To install the latest released version of <em>Kasai</em>, use the following command:</p>
@@ -146,7 +147,10 @@ readme = Path(__file__).parent.parent / &#34;README.md&#34;
 
 # This is only needed for documentation purposes.
 if readme.is_file():
-    __doc__ = readme.read_text()[9:]
+    __doc__ = (
+        f&#34;**Welcome to the documentation for Kasai v{__version__}!**\n\n&#34;
+        + readme.read_text()[9:]
+    )
 
 from kasai.bot import *
 from kasai.channels import *

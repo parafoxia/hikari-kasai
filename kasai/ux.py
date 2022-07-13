@@ -34,6 +34,7 @@ __all__ = ("display_splash", "deprecated", "depr_warn")
 
 import logging
 import typing as t
+from functools import wraps
 
 from hikari import cli
 
@@ -57,6 +58,7 @@ def depr_warn(thing: str, ver: str, resolution: str | None) -> None:
 
 def deprecated(ver: str, resolution: str | None = None) -> t.Callable[[_FuncT], _FuncT]:
     def decorator(func: _FuncT) -> _FuncT:
+        @wraps(func)
         def wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
             depr_warn(ver, func.__qualname__, resolution)
             return func(*args, **kwargs)

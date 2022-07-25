@@ -158,17 +158,14 @@ class GatewayBot(hikari.GatewayBot):
         await loop.sock_connect(self._twitch._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
         _log.info(&#34;connected to Twitch&#34;)
 
-        try:
-            await loop.sock_sendall(
-                self._twitch._sock,
-                (
-                    f&#34;PASS {self._twitch._token}\r\n&#34;
-                    f&#34;NICK {self._twitch._nickname}\r\n&#34;
-                    &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
-                ).encode(),
-            )
-        except Exception as exc:
-            raise exc
+        await loop.sock_sendall(
+            self._twitch._sock,
+            (
+                f&#34;PASS {self._twitch._token}\r\n&#34;
+                f&#34;NICK {self._twitch._nickname}\r\n&#34;
+                &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+            ).encode(),
+        )
 
         self._twitch._task = loop.create_task(self._twitch._irclisten(loop))
         _log.info(&#34;successfully started IRC websocket&#34;)
@@ -385,17 +382,14 @@ boot.</li>
         await loop.sock_connect(self._twitch._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
         _log.info(&#34;connected to Twitch&#34;)
 
-        try:
-            await loop.sock_sendall(
-                self._twitch._sock,
-                (
-                    f&#34;PASS {self._twitch._token}\r\n&#34;
-                    f&#34;NICK {self._twitch._nickname}\r\n&#34;
-                    &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
-                ).encode(),
-            )
-        except Exception as exc:
-            raise exc
+        await loop.sock_sendall(
+            self._twitch._sock,
+            (
+                f&#34;PASS {self._twitch._token}\r\n&#34;
+                f&#34;NICK {self._twitch._nickname}\r\n&#34;
+                &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+            ).encode(),
+        )
 
         self._twitch._task = loop.create_task(self._twitch._irclisten(loop))
         _log.info(&#34;successfully started IRC websocket&#34;)
@@ -690,17 +684,14 @@ later. All channels must be prefixed with a hash (#).</dd>
     await loop.sock_connect(self._twitch._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
     _log.info(&#34;connected to Twitch&#34;)
 
-    try:
-        await loop.sock_sendall(
-            self._twitch._sock,
-            (
-                f&#34;PASS {self._twitch._token}\r\n&#34;
-                f&#34;NICK {self._twitch._nickname}\r\n&#34;
-                &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
-            ).encode(),
-        )
-    except Exception as exc:
-        raise exc
+    await loop.sock_sendall(
+        self._twitch._sock,
+        (
+            f&#34;PASS {self._twitch._token}\r\n&#34;
+            f&#34;NICK {self._twitch._nickname}\r\n&#34;
+            &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+        ).encode(),
+    )
 
     self._twitch._task = loop.create_task(self._twitch._irclisten(loop))
     _log.info(&#34;successfully started IRC websocket&#34;)

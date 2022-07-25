@@ -201,10 +201,16 @@ class TwitchClient:
         ------
         kasai.errors.NotConnected
             The client is not connected to a Twitch channel.
+
+        kasai.errors.NotInChannel
+            The client has not joined the given channel.
         """
 
         if self._sock is None:
             raise kasai.NotConnected("no active connections to send a message to")
+
+        if channel not in self._channels:
+            raise kasai.NotInChannel(f"the client is not connected to {channel}")
 
         msg = (
             f":{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv "

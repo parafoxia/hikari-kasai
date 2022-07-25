@@ -26,7 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__all__ = ("KasaiError", "NotConnected", "AlreadyConnected")
+__all__ = ("KasaiError", "NotConnected", "AlreadyConnected", "NotInChannel")
 
 
 class KasaiError(Exception):
@@ -41,3 +41,8 @@ class NotConnected(KasaiError):
 class AlreadyConnected(KasaiError):
     """Exception thrown when connection operations are attempted when
     the client is already connected."""
+
+
+class NotInChannel(KasaiError):
+    """Exception thrown when a channel operation is attempted on a
+    channel the client is not connected to."""

@@ -54,7 +54,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__all__ = (&#34;KasaiError&#34;, &#34;NotConnected&#34;, &#34;AlreadyConnected&#34;)
+__all__ = (&#34;KasaiError&#34;, &#34;NotConnected&#34;, &#34;AlreadyConnected&#34;, &#34;NotInChannel&#34;)
 
 
 class KasaiError(Exception):
@@ -68,7 +68,12 @@ class NotConnected(KasaiError):
 
 class AlreadyConnected(KasaiError):
     &#34;&#34;&#34;Exception thrown when connection operations are attempted when
-    the client is already connected.&#34;&#34;&#34;</code></pre>
+    the client is already connected.&#34;&#34;&#34;
+
+
+class NotInChannel(KasaiError):
+    &#34;&#34;&#34;Exception thrown when a channel operation is attempted on a
+    channel the client is not connected to.&#34;&#34;&#34;</code></pre>
 </details>
 </section>
 <section>
@@ -124,6 +129,7 @@ the client is already connected.</p></div>
 <ul class="hlist">
 <li><a title="kasai.errors.AlreadyConnected" href="#kasai.errors.AlreadyConnected">AlreadyConnected</a></li>
 <li><a title="kasai.errors.NotConnected" href="#kasai.errors.NotConnected">NotConnected</a></li>
+<li><a title="kasai.errors.NotInChannel" href="#kasai.errors.NotInChannel">NotInChannel</a></li>
 </ul>
 </dd>
 <dt id="kasai.errors.NotConnected"><code class="flex name class">
@@ -140,6 +146,28 @@ connected are attempted without the connection.</p></div>
 <pre><code class="python">class NotConnected(KasaiError):
     &#34;&#34;&#34;Exception thrown when operations that require the client to be
     connected are attempted without the connection.&#34;&#34;&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="kasai.errors.KasaiError" href="#kasai.errors.KasaiError">KasaiError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="kasai.errors.NotInChannel"><code class="flex name class">
+<span>class <span class="ident">NotInChannel</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Exception thrown when a channel operation is attempted on a
+channel the client is not connected to.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NotInChannel(KasaiError):
+    &#34;&#34;&#34;Exception thrown when a channel operation is attempted on a
+    channel the client is not connected to.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -218,6 +246,9 @@ setTimeout(() => input.focus(), 100);
 </li>
 <li>
 <h4><code><a title="kasai.errors.NotConnected" href="#kasai.errors.NotConnected">NotConnected</a></code></h4>
+</li>
+<li>
+<h4><code><a title="kasai.errors.NotInChannel" href="#kasai.errors.NotInChannel">NotInChannel</a></code></h4>
 </li>
 </ul>
 </li>

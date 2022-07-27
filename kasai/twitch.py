@@ -377,7 +377,10 @@ class TwitchClient:
         Example
         -------
         ```py
-        >>> await bot.twitch.create_message("parafoxia", "Never gonna give you up!")
+        >>> await bot.twitch.create_message(
+            "parafoxia",
+            "Never gonna give you up!",
+        )
         ```
 
         Parameters

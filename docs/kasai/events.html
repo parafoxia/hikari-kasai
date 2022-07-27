@@ -58,16 +58,19 @@ from __future__ import annotations
 
 __all__ = (
     &#34;KasaiEvent&#34;,
-    &#34;PrivMessageCreateEvent&#34;,
+    &#34;MessageCreateEvent&#34;,
     &#34;PingEvent&#34;,
     &#34;JoinEvent&#34;,
     &#34;PartEvent&#34;,
+    &#34;JoinRoomstateEvent&#34;,
+    &#34;ModActionEvent&#34;,
     &#34;ClearEvent&#34;,
     &#34;BanEvent&#34;,
     &#34;TimeoutEvent&#34;,
 )
 
-import typing as t
+import abc
+import datetime as dt
 
 import attr
 from hikari import Event
@@ -75,195 +78,220 @@ from hikari.internal import attr_extensions
 
 import kasai
 
-if t.TYPE_CHECKING:
-    from hikari import traits
 
-    from kasai.messages import JoinMessage, ModActionMessage, PartMessage, PrivMessage
+class KasaiEvent(Event, abc.ABC):
+    &#34;&#34;&#34;The basis for all Kasai events.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The bot client instance.&#34;&#34;&#34;
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class KasaiEvent(Event):
-    &#34;&#34;&#34;A dataclass representing a Kasai event. All instance attributes
-    must be passed to the constructor on creation.
-    &#34;&#34;&#34;
-
-    app: traits.RESTAware = attr.field(metadata={attr_extensions.SKIP_DEEP_COPY: True})
-    &#34;&#34;&#34;The bot client instance.&#34;&#34;&#34;
-
-
-@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class PrivMessageCreateEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client receives a new Twitch
-    chat message. All instance attributes must be passed to the
-    constructor on creation.
+class MessageCreateEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when a Twitch IRC message is sent.
 
     .. important::
         This event is not triggered when your bot sends a message.
     &#34;&#34;&#34;
 
-    message: PrivMessage
+    message: kasai.Message = attr.field()
     &#34;&#34;&#34;The message that was sent.&#34;&#34;&#34;
 
     @property
-    def author(self) -&gt; kasai.User:
-        &#34;&#34;&#34;The message&#39;s author.
+    def message_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the sent message.&#34;&#34;&#34;
+        return self.message.id
 
-        Returns
-        -------
-        kasai.users.User
-        &#34;&#34;&#34;
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
+        return self.message.app
 
+    @property
+    def author(self) -&gt; kasai.Viewer:
+        &#34;&#34;&#34;The user who sent the message.&#34;&#34;&#34;
         return self.message.author
 
     @property
+    def author_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user who sent the message.&#34;&#34;&#34;
+        return self.message.author.id
+
+    @property
     def channel(self) -&gt; kasai.Channel:
-        &#34;&#34;&#34;The channel the message was sent to.
-
-        Returns
-        -------
-        kasai.channels.Channel
-        &#34;&#34;&#34;
-
+        &#34;&#34;&#34;The channel the message was sent to.&#34;&#34;&#34;
         return self.message.channel
 
     @property
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel the message was sent to.&#34;&#34;&#34;
+        return self.message.channel.id
+
+    @property
+    def bits(self) -&gt; int:
+        &#34;&#34;&#34;The number of bits the user sent in the message.&#34;&#34;&#34;
+        return self.message.bits
+
+    @property
     def content(self) -&gt; str:
-        &#34;&#34;&#34;The content of the message.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
+        &#34;&#34;&#34;The text content of the message.&#34;&#34;&#34;
         return self.message.content
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class PingEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client receives a PING message
-    from the Twitch server. All instance attributes must be passed to
-    the constructor on creation.
-    &#34;&#34;&#34;
+    &#34;&#34;&#34;Event fired when the client receives a PING message.&#34;&#34;&#34;
+
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class JoinEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client joins a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
+    &#34;&#34;&#34;Event fired when the client joins a Twitch channel&#39;s chat.
+
+    .. important::
+        To get more information about the channel, use
+        `JoinRoomstateEvent` instead.
     &#34;&#34;&#34;
 
-    message: JoinMessage
-    &#34;&#34;&#34;A representation of a JOIN message.&#34;&#34;&#34;
+    channel: str = attr.field()
+    &#34;&#34;&#34;The name of the channel the client joined.&#34;&#34;&#34;
 
-    @property
-    def channel_name(self) -&gt; str:
-        &#34;&#34;&#34;The name of the channel which was joined.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        return self.message.channel_name
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class PartEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client parts a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
-    &#34;&#34;&#34;
+    &#34;&#34;&#34;Event fired when the client parts (leaves) a Twitch channel&#39;s
+    chat.&#34;&#34;&#34;
 
-    message: PartMessage
-    &#34;&#34;&#34;A representation of a PART message.&#34;&#34;&#34;
+    channel: str = attr.field()
+    &#34;&#34;&#34;The name of the channel the client parted.&#34;&#34;&#34;
 
-    @property
-    def channel_name(self) -&gt; str:
-        &#34;&#34;&#34;The name of the channel which was parted.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        return self.message.channel_name
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class ClearEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a clear command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
+class JoinRoomstateEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when the client receives ROOMSTATE information after
+    joining a channel.
+
+    .. note::
+        This event contains more detailed information regarding the
+        channel the client joined, however as that information does not
+        always get sent from Twitch immediately, it is dispatched with
+        a separate event.
     &#34;&#34;&#34;
 
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;
+    channel: kasai.Channel = attr.field()
+    &#34;&#34;&#34;The channel the client joined.&#34;&#34;&#34;
+
+    @property
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel the client joined.&#34;&#34;&#34;
+        return self.channel.id
+
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+        return self.channel.app
+
+    @property
+    def game(self) -&gt; kasai.Game:
+        &#34;&#34;&#34;The game the channel is currently playing (or most recently
+        played).&#34;&#34;&#34;
+        return self.channel.game
+
+    @property
+    def game_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the game the channel is currently playing (or most
+        recently played).&#34;&#34;&#34;
+        return self.channel.game.id
+
+    @property
+    def title(self) -&gt; str:
+        &#34;&#34;&#34;The title of the channel&#39;s current (or most recent)
+        stream.&#34;&#34;&#34;
+        return self.channel.title
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class BanEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a ban command is sent to the Twitch
-    channel. All instance attributes must be passed to the constructor
-    on creation.
+class ModActionEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when a moderation action is taken.
+
+    .. note::
+        This currently only supports CLEARCHAT, BAN, and TIMEOUT
+        actions.
     &#34;&#34;&#34;
 
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;
+    channel: kasai.Channel = attr.field()
+    &#34;&#34;&#34;The channel the mod action was performed in.&#34;&#34;&#34;
+
+    created_at: dt.datetime = attr.field()
+    &#34;&#34;&#34;The date and time the mod action was executed.&#34;&#34;&#34;
 
     @property
-    def target_id(self) -&gt; str:
-        &#34;&#34;&#34;The target user&#39;s ID.
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel.&#34;&#34;&#34;
+        return self.channel.id
 
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        assert self.message.target_id is not None
-        return self.message.target_id
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+        return self.channel.app
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class TimeoutEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a timeout command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
-    &#34;&#34;&#34;
+class ClearEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a chat is cleared.&#34;&#34;&#34;
 
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;
 
-    @property
-    def target_id(self) -&gt; str:
-        &#34;&#34;&#34;The target user&#39;s ID.
+@attr.define(kw_only=True, weakref_slot=False)
+class BanEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a user is banned from a chat channel.&#34;&#34;&#34;
 
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        assert self.message.target_id is not None
-        return self.message.target_id
+    user: kasai.User = attr.field()
+    &#34;&#34;&#34;The user that was banned.&#34;&#34;&#34;
 
     @property
-    def duration(self) -&gt; int:
-        &#34;&#34;&#34;The timeout duration.
+    def user_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+        return self.user.id
 
-        Returns
-        -------
-        builtins.int
-        &#34;&#34;&#34;
 
-        return self.message.duration</code></pre>
+@attr.define(kw_only=True, weakref_slot=False)
+class TimeoutEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a user is timed out from a chat channel.&#34;&#34;&#34;
+
+    user: kasai.User = attr.field()
+    &#34;&#34;&#34;The user that was banned.&#34;&#34;&#34;
+
+    duration: int = attr.field()
+    &#34;&#34;&#34;The duration of the timeout, in seconds.&#34;&#34;&#34;
+
+    @property
+    def user_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+        return self.user.id</code></pre>
 </details>
 </section>
 <section>
@@ -277,167 +305,135 @@ class TimeoutEvent(KasaiEvent):
 <dl>
 <dt id="kasai.events.BanEvent"><code class="flex name class">
 <span>class <span class="ident">BanEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: ModActionMessage)</span>
+<span>(</span><span>*, channel: kasai.Channel, created_at: dt.datetime, user: kasai.User)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass created whenever a ban command is sent to the Twitch
-channel. All instance attributes must be passed to the constructor
-on creation.</p>
+<div class="desc"><p>Event fired when a user is banned from a chat channel.</p>
 <p>Method generated by attrs for class BanEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class BanEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a ban command is sent to the Twitch
-    channel. All instance attributes must be passed to the constructor
-    on creation.
-    &#34;&#34;&#34;
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class BanEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a user is banned from a chat channel.&#34;&#34;&#34;
 
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;
+    user: kasai.User = attr.field()
+    &#34;&#34;&#34;The user that was banned.&#34;&#34;&#34;
 
     @property
-    def target_id(self) -&gt; str:
-        &#34;&#34;&#34;The target user&#39;s ID.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        assert self.message.target_id is not None
-        return self.message.target_id</code></pre>
+    def user_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+        return self.user.id</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></li>
 <li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
 <li>hikari.events.base_events.Event</li>
 <li>abc.ABC</li>
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.events.BanEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
+<dt id="kasai.events.BanEvent.user"><code class="name">var <span class="ident">user</span> : <a title="kasai.users.User" href="users.html#kasai.users.User">User</a></code></dt>
 <dd>
-<div class="desc"><p>A representation of a CLEARCHAT message.</p></div>
+<div class="desc"><p>The user that was banned.</p></div>
 </dd>
-<dt id="kasai.events.BanEvent.target_id"><code class="name">var <span class="ident">target_id</span> : str</code></dt>
+<dt id="kasai.events.BanEvent.user_id"><code class="name">var <span class="ident">user_id</span> : str</code></dt>
 <dd>
-<div class="desc"><p>The target user's ID.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>The ID of the user that was banned.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def target_id(self) -&gt; str:
-    &#34;&#34;&#34;The target user&#39;s ID.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    assert self.message.target_id is not None
-    return self.message.target_id</code></pre>
+def user_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+    return self.user.id</code></pre>
 </details>
 </dd>
 </dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
+<li><code><b><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></b></code>:
 <ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.app" href="#kasai.events.ModActionEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel" href="#kasai.events.ModActionEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel_id" href="#kasai.events.ModActionEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.created_at" href="#kasai.events.ModActionEvent.created_at">created_at</a></code></li>
 </ul>
 </li>
 </ul>
 </dd>
 <dt id="kasai.events.ClearEvent"><code class="flex name class">
 <span>class <span class="ident">ClearEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: ModActionMessage)</span>
+<span>(</span><span>*, channel: kasai.Channel, created_at: dt.datetime)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass created whenever a clear command is sent to the
-Twitch channel. All instance attributes must be passed to the
-constructor on creation.</p>
+<div class="desc"><p>Event fired when a chat is cleared.</p>
 <p>Method generated by attrs for class ClearEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class ClearEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a clear command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
-    &#34;&#34;&#34;
-
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;</code></pre>
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class ClearEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a chat is cleared.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></li>
 <li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
 <li>hikari.events.base_events.Event</li>
 <li>abc.ABC</li>
 </ul>
-<h3>Instance variables</h3>
-<dl>
-<dt id="kasai.events.ClearEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
-<dd>
-<div class="desc"><p>A representation of a CLEARCHAT message.</p></div>
-</dd>
-</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
+<li><code><b><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></b></code>:
 <ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.app" href="#kasai.events.ModActionEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel" href="#kasai.events.ModActionEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel_id" href="#kasai.events.ModActionEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.created_at" href="#kasai.events.ModActionEvent.created_at">created_at</a></code></li>
 </ul>
 </li>
 </ul>
 </dd>
 <dt id="kasai.events.JoinEvent"><code class="flex name class">
 <span>class <span class="ident">JoinEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: JoinMessage)</span>
+<span>(</span><span>*, channel: str, app: kasai.TwitchAware)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass created whenever the client joins a Twitch channel.
-All instance attributes must be passed to the constructor on
-creation.</p>
+<div class="desc"><p>Event fired when the client joins a Twitch channel's chat.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>To get more information about the channel, use
+<code><a title="kasai.events.JoinRoomstateEvent" href="#kasai.events.JoinRoomstateEvent">JoinRoomstateEvent</a></code> instead.</p>
+</div>
 <p>Method generated by attrs for class JoinEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
 class JoinEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client joins a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
+    &#34;&#34;&#34;Event fired when the client joins a Twitch channel&#39;s chat.
+
+    .. important::
+        To get more information about the channel, use
+        `JoinRoomstateEvent` instead.
     &#34;&#34;&#34;
 
-    message: JoinMessage
-    &#34;&#34;&#34;A representation of a JOIN message.&#34;&#34;&#34;
+    channel: str = attr.field()
+    &#34;&#34;&#34;The name of the channel the client joined.&#34;&#34;&#34;
 
-    @property
-    def channel_name(self) -&gt; str:
-        &#34;&#34;&#34;The name of the channel which was joined.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        return self.message.channel_name</code></pre>
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -447,65 +443,179 @@ class JoinEvent(KasaiEvent):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.events.JoinEvent.channel_name"><code class="name">var <span class="ident">channel_name</span> : str</code></dt>
+<dt id="kasai.events.JoinEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
 <dd>
-<div class="desc"><p>The name of the channel which was joined.</p>
-<h2 id="returns">Returns</h2>
+<div class="desc"><p>The base client application.</p></div>
+</dd>
+<dt id="kasai.events.JoinEvent.channel"><code class="name">var <span class="ident">channel</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The name of the channel the client joined.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.events.JoinRoomstateEvent"><code class="flex name class">
+<span>class <span class="ident">JoinRoomstateEvent</span></span>
+<span>(</span><span>*, channel: kasai.Channel)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Event fired when the client receives ROOMSTATE information after
+joining a channel.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This event contains more detailed information regarding the
+channel the client joined, however as that information does not
+always get sent from Twitch immediately, it is dispatched with
+a separate event.</p>
+</div>
+<p>Method generated by attrs for class JoinRoomstateEvent.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class JoinRoomstateEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when the client receives ROOMSTATE information after
+    joining a channel.
+
+    .. note::
+        This event contains more detailed information regarding the
+        channel the client joined, however as that information does not
+        always get sent from Twitch immediately, it is dispatched with
+        a separate event.
+    &#34;&#34;&#34;
+
+    channel: kasai.Channel = attr.field()
+    &#34;&#34;&#34;The channel the client joined.&#34;&#34;&#34;
+
+    @property
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel the client joined.&#34;&#34;&#34;
+        return self.channel.id
+
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+        return self.channel.app
+
+    @property
+    def game(self) -&gt; kasai.Game:
+        &#34;&#34;&#34;The game the channel is currently playing (or most recently
+        played).&#34;&#34;&#34;
+        return self.channel.game
+
+    @property
+    def game_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the game the channel is currently playing (or most
+        recently played).&#34;&#34;&#34;
+        return self.channel.game.id
+
+    @property
+    def title(self) -&gt; str:
+        &#34;&#34;&#34;The title of the channel&#39;s current (or most recent)
+        stream.&#34;&#34;&#34;
+        return self.channel.title</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
+<li>hikari.events.base_events.Event</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Instance variables</h3>
 <dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<dt id="kasai.events.JoinRoomstateEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
+<dd>
+<div class="desc"><p>The base client instance.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def channel_name(self) -&gt; str:
-    &#34;&#34;&#34;The name of the channel which was joined.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    return self.message.channel_name</code></pre>
+def app(self) -&gt; kasai.TwitchAware:
+    &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+    return self.channel.app</code></pre>
 </details>
 </dd>
-<dt id="kasai.events.JoinEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
+<dt id="kasai.events.JoinRoomstateEvent.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
 <dd>
-<div class="desc"><p>A representation of a JOIN message.</p></div>
+<div class="desc"><p>The channel the client joined.</p></div>
 </dd>
-</dl>
-<h3>Inherited members</h3>
-<ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
-<ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
-</ul>
-</li>
-</ul>
-</dd>
-<dt id="kasai.events.KasaiEvent"><code class="flex name class">
-<span>class <span class="ident">KasaiEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware)</span>
-</code></dt>
+<dt id="kasai.events.JoinRoomstateEvent.channel_id"><code class="name">var <span class="ident">channel_id</span> : str</code></dt>
 <dd>
-<div class="desc"><p>A dataclass representing a Kasai event. All instance attributes
-must be passed to the constructor on creation.</p>
-<p>Method generated by attrs for class KasaiEvent.</p></div>
+<div class="desc"><p>The ID of the channel the client joined.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class KasaiEvent(Event):
-    &#34;&#34;&#34;A dataclass representing a Kasai event. All instance attributes
-    must be passed to the constructor on creation.
-    &#34;&#34;&#34;
+<pre><code class="python">@property
+def channel_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the channel the client joined.&#34;&#34;&#34;
+    return self.channel.id</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.JoinRoomstateEvent.game"><code class="name">var <span class="ident">game</span> : <a title="kasai.channels.Game" href="channels.html#kasai.channels.Game">Game</a></code></dt>
+<dd>
+<div class="desc"><p>The game the channel is currently playing (or most recently
+played).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def game(self) -&gt; kasai.Game:
+    &#34;&#34;&#34;The game the channel is currently playing (or most recently
+    played).&#34;&#34;&#34;
+    return self.channel.game</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.JoinRoomstateEvent.game_id"><code class="name">var <span class="ident">game_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the game the channel is currently playing (or most
+recently played).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def game_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the game the channel is currently playing (or most
+    recently played).&#34;&#34;&#34;
+    return self.channel.game.id</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.JoinRoomstateEvent.title"><code class="name">var <span class="ident">title</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The title of the channel's current (or most recent)
+stream.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def title(self) -&gt; str:
+    &#34;&#34;&#34;The title of the channel&#39;s current (or most recent)
+    stream.&#34;&#34;&#34;
+    return self.channel.title</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.events.KasaiEvent"><code class="flex name class">
+<span>class <span class="ident">KasaiEvent</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>The basis for all Kasai events.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class KasaiEvent(Event, abc.ABC):
+    &#34;&#34;&#34;The basis for all Kasai events.&#34;&#34;&#34;
 
-    app: traits.RESTAware = attr.field(metadata={attr_extensions.SKIP_DEEP_COPY: True})
-    &#34;&#34;&#34;The bot client instance.&#34;&#34;&#34;</code></pre>
+    @property
+    @abc.abstractmethod
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The bot client instance.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -514,56 +624,95 @@ class KasaiEvent(Event):
 </ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
-<li><a title="kasai.events.BanEvent" href="#kasai.events.BanEvent">BanEvent</a></li>
-<li><a title="kasai.events.ClearEvent" href="#kasai.events.ClearEvent">ClearEvent</a></li>
 <li><a title="kasai.events.JoinEvent" href="#kasai.events.JoinEvent">JoinEvent</a></li>
+<li><a title="kasai.events.JoinRoomstateEvent" href="#kasai.events.JoinRoomstateEvent">JoinRoomstateEvent</a></li>
+<li><a title="kasai.events.MessageCreateEvent" href="#kasai.events.MessageCreateEvent">MessageCreateEvent</a></li>
+<li><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></li>
 <li><a title="kasai.events.PartEvent" href="#kasai.events.PartEvent">PartEvent</a></li>
 <li><a title="kasai.events.PingEvent" href="#kasai.events.PingEvent">PingEvent</a></li>
-<li><a title="kasai.events.PrivMessageCreateEvent" href="#kasai.events.PrivMessageCreateEvent">PrivMessageCreateEvent</a></li>
-<li><a title="kasai.events.TimeoutEvent" href="#kasai.events.TimeoutEvent">TimeoutEvent</a></li>
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.events.KasaiEvent.app"><code class="name">var <span class="ident">app</span></code></dt>
+<dt id="kasai.events.KasaiEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
 <dd>
 <div class="desc"><p>The bot client instance.</p></div>
-</dd>
-</dl>
-</dd>
-<dt id="kasai.events.PartEvent"><code class="flex name class">
-<span>class <span class="ident">PartEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: PartMessage)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A dataclass created whenever the client parts a Twitch channel.
-All instance attributes must be passed to the constructor on
-creation.</p>
-<p>Method generated by attrs for class PartEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class PartEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client parts a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
+<pre><code class="python">@property
+@abc.abstractmethod
+def app(self) -&gt; kasai.TwitchAware:
+    &#34;&#34;&#34;The bot client instance.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.events.MessageCreateEvent"><code class="flex name class">
+<span>class <span class="ident">MessageCreateEvent</span></span>
+<span>(</span><span>*, message: kasai.Message)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Event fired when a Twitch IRC message is sent.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>This event is not triggered when your bot sends a message.</p>
+</div>
+<p>Method generated by attrs for class MessageCreateEvent.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class MessageCreateEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when a Twitch IRC message is sent.
+
+    .. important::
+        This event is not triggered when your bot sends a message.
     &#34;&#34;&#34;
 
-    message: PartMessage
-    &#34;&#34;&#34;A representation of a PART message.&#34;&#34;&#34;
+    message: kasai.Message = attr.field()
+    &#34;&#34;&#34;The message that was sent.&#34;&#34;&#34;
 
     @property
-    def channel_name(self) -&gt; str:
-        &#34;&#34;&#34;The name of the channel which was parted.
+    def message_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the sent message.&#34;&#34;&#34;
+        return self.message.id
 
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
+        return self.message.app
 
-        return self.message.channel_name</code></pre>
+    @property
+    def author(self) -&gt; kasai.Viewer:
+        &#34;&#34;&#34;The user who sent the message.&#34;&#34;&#34;
+        return self.message.author
+
+    @property
+    def author_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user who sent the message.&#34;&#34;&#34;
+        return self.message.author.id
+
+    @property
+    def channel(self) -&gt; kasai.Channel:
+        &#34;&#34;&#34;The channel the message was sent to.&#34;&#34;&#34;
+        return self.message.channel
+
+    @property
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel the message was sent to.&#34;&#34;&#34;
+        return self.message.channel.id
+
+    @property
+    def bits(self) -&gt; int:
+        &#34;&#34;&#34;The number of bits the user sent in the message.&#34;&#34;&#34;
+        return self.message.bits
+
+    @property
+    def content(self) -&gt; str:
+        &#34;&#34;&#34;The text content of the message.&#34;&#34;&#34;
+        return self.message.content</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -573,33 +722,245 @@ class PartEvent(KasaiEvent):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.events.PartEvent.channel_name"><code class="name">var <span class="ident">channel_name</span> : str</code></dt>
+<dt id="kasai.events.MessageCreateEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
 <dd>
-<div class="desc"><p>The name of the channel which was parted.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>The base client application.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def channel_name(self) -&gt; str:
-    &#34;&#34;&#34;The name of the channel which was parted.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    return self.message.channel_name</code></pre>
+def app(self) -&gt; kasai.TwitchAware:
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
+    return self.message.app</code></pre>
 </details>
 </dd>
-<dt id="kasai.events.PartEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
+<dt id="kasai.events.MessageCreateEvent.author"><code class="name">var <span class="ident">author</span> : <a title="kasai.users.Viewer" href="users.html#kasai.users.Viewer">Viewer</a></code></dt>
 <dd>
-<div class="desc"><p>A representation of a PART message.</p></div>
+<div class="desc"><p>The user who sent the message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def author(self) -&gt; kasai.Viewer:
+    &#34;&#34;&#34;The user who sent the message.&#34;&#34;&#34;
+    return self.message.author</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.author_id"><code class="name">var <span class="ident">author_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the user who sent the message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def author_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the user who sent the message.&#34;&#34;&#34;
+    return self.message.author.id</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.bits"><code class="name">var <span class="ident">bits</span> : int</code></dt>
+<dd>
+<div class="desc"><p>The number of bits the user sent in the message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def bits(self) -&gt; int:
+    &#34;&#34;&#34;The number of bits the user sent in the message.&#34;&#34;&#34;
+    return self.message.bits</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
+<dd>
+<div class="desc"><p>The channel the message was sent to.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def channel(self) -&gt; kasai.Channel:
+    &#34;&#34;&#34;The channel the message was sent to.&#34;&#34;&#34;
+    return self.message.channel</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.channel_id"><code class="name">var <span class="ident">channel_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the channel the message was sent to.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def channel_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the channel the message was sent to.&#34;&#34;&#34;
+    return self.message.channel.id</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.content"><code class="name">var <span class="ident">content</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The text content of the message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def content(self) -&gt; str:
+    &#34;&#34;&#34;The text content of the message.&#34;&#34;&#34;
+    return self.message.content</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.message"><code class="name">var <span class="ident">message</span> : <a title="kasai.messages.Message" href="messages.html#kasai.messages.Message">Message</a></code></dt>
+<dd>
+<div class="desc"><p>The message that was sent.</p></div>
+</dd>
+<dt id="kasai.events.MessageCreateEvent.message_id"><code class="name">var <span class="ident">message_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the sent message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def message_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the sent message.&#34;&#34;&#34;
+    return self.message.id</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.events.ModActionEvent"><code class="flex name class">
+<span>class <span class="ident">ModActionEvent</span></span>
+<span>(</span><span>*, channel: kasai.Channel, created_at: dt.datetime)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Event fired when a moderation action is taken.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This currently only supports CLEARCHAT, BAN, and TIMEOUT
+actions.</p>
+</div>
+<p>Method generated by attrs for class ModActionEvent.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class ModActionEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when a moderation action is taken.
+
+    .. note::
+        This currently only supports CLEARCHAT, BAN, and TIMEOUT
+        actions.
+    &#34;&#34;&#34;
+
+    channel: kasai.Channel = attr.field()
+    &#34;&#34;&#34;The channel the mod action was performed in.&#34;&#34;&#34;
+
+    created_at: dt.datetime = attr.field()
+    &#34;&#34;&#34;The date and time the mod action was executed.&#34;&#34;&#34;
+
+    @property
+    def channel_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the channel.&#34;&#34;&#34;
+        return self.channel.id
+
+    @property
+    def app(self) -&gt; kasai.TwitchAware:
+        &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+        return self.channel.app</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
+<li>hikari.events.base_events.Event</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="kasai.events.BanEvent" href="#kasai.events.BanEvent">BanEvent</a></li>
+<li><a title="kasai.events.ClearEvent" href="#kasai.events.ClearEvent">ClearEvent</a></li>
+<li><a title="kasai.events.TimeoutEvent" href="#kasai.events.TimeoutEvent">TimeoutEvent</a></li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="kasai.events.ModActionEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
+<dd>
+<div class="desc"><p>The base client instance.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def app(self) -&gt; kasai.TwitchAware:
+    &#34;&#34;&#34;The base client instance.&#34;&#34;&#34;
+    return self.channel.app</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.ModActionEvent.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
+<dd>
+<div class="desc"><p>The channel the mod action was performed in.</p></div>
+</dd>
+<dt id="kasai.events.ModActionEvent.channel_id"><code class="name">var <span class="ident">channel_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the channel.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def channel_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the channel.&#34;&#34;&#34;
+    return self.channel.id</code></pre>
+</details>
+</dd>
+<dt id="kasai.events.ModActionEvent.created_at"><code class="name">var <span class="ident">created_at</span> : datetime.datetime</code></dt>
+<dd>
+<div class="desc"><p>The date and time the mod action was executed.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.events.PartEvent"><code class="flex name class">
+<span>class <span class="ident">PartEvent</span></span>
+<span>(</span><span>*, channel: str, app: kasai.TwitchAware)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Event fired when the client parts (leaves) a Twitch channel's
+chat.</p>
+<p>Method generated by attrs for class PartEvent.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class PartEvent(KasaiEvent):
+    &#34;&#34;&#34;Event fired when the client parts (leaves) a Twitch channel&#39;s
+    chat.&#34;&#34;&#34;
+
+    channel: str = attr.field()
+    &#34;&#34;&#34;The name of the channel the client parted.&#34;&#34;&#34;
+
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
+<li>hikari.events.base_events.Event</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="kasai.events.PartEvent.channel"><code class="name">var <span class="ident">channel</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The name of the channel the client parted.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -613,103 +974,26 @@ def channel_name(self) -&gt; str:
 </dd>
 <dt id="kasai.events.PingEvent"><code class="flex name class">
 <span>class <span class="ident">PingEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware)</span>
+<span>(</span><span>*, app: kasai.TwitchAware)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass created whenever the client receives a PING message
-from the Twitch server. All instance attributes must be passed to
-the constructor on creation.</p>
+<div class="desc"><p>Event fired when the client receives a PING message.</p>
 <p>Method generated by attrs for class PingEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
 class PingEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client receives a PING message
-    from the Twitch server. All instance attributes must be passed to
-    the constructor on creation.
-    &#34;&#34;&#34;</code></pre>
-</details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
-<li>hikari.events.base_events.Event</li>
-<li>abc.ABC</li>
-</ul>
-<h3>Inherited members</h3>
-<ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
-<ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
-</ul>
-</li>
-</ul>
-</dd>
-<dt id="kasai.events.PrivMessageCreateEvent"><code class="flex name class">
-<span>class <span class="ident">PrivMessageCreateEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: PrivMessage)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A dataclass created whenever the client receives a new Twitch
-chat message. All instance attributes must be passed to the
-constructor on creation.</p>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>This event is not triggered when your bot sends a message.</p>
-</div>
-<p>Method generated by attrs for class PrivMessageCreateEvent.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class PrivMessageCreateEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever the client receives a new Twitch
-    chat message. All instance attributes must be passed to the
-    constructor on creation.
+    &#34;&#34;&#34;Event fired when the client receives a PING message.&#34;&#34;&#34;
 
-    .. important::
-        This event is not triggered when your bot sends a message.
-    &#34;&#34;&#34;
-
-    message: PrivMessage
-    &#34;&#34;&#34;The message that was sent.&#34;&#34;&#34;
-
-    @property
-    def author(self) -&gt; kasai.User:
-        &#34;&#34;&#34;The message&#39;s author.
-
-        Returns
-        -------
-        kasai.users.User
-        &#34;&#34;&#34;
-
-        return self.message.author
-
-    @property
-    def channel(self) -&gt; kasai.Channel:
-        &#34;&#34;&#34;The channel the message was sent to.
-
-        Returns
-        -------
-        kasai.channels.Channel
-        &#34;&#34;&#34;
-
-        return self.message.channel
-
-    @property
-    def content(self) -&gt; str:
-        &#34;&#34;&#34;The content of the message.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        return self.message.content</code></pre>
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -719,141 +1003,41 @@ class PrivMessageCreateEvent(KasaiEvent):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.events.PrivMessageCreateEvent.author"><code class="name">var <span class="ident">author</span> : <a title="kasai.users.User" href="users.html#kasai.users.User">User</a></code></dt>
+<dt id="kasai.events.PingEvent.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
 <dd>
-<div class="desc"><p>The message's author.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code><a title="kasai.users.User" href="users.html#kasai.users.User">User</a></code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@property
-def author(self) -&gt; kasai.User:
-    &#34;&#34;&#34;The message&#39;s author.
-
-    Returns
-    -------
-    kasai.users.User
-    &#34;&#34;&#34;
-
-    return self.message.author</code></pre>
-</details>
-</dd>
-<dt id="kasai.events.PrivMessageCreateEvent.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
-<dd>
-<div class="desc"><p>The channel the message was sent to.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code><a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@property
-def channel(self) -&gt; kasai.Channel:
-    &#34;&#34;&#34;The channel the message was sent to.
-
-    Returns
-    -------
-    kasai.channels.Channel
-    &#34;&#34;&#34;
-
-    return self.message.channel</code></pre>
-</details>
-</dd>
-<dt id="kasai.events.PrivMessageCreateEvent.content"><code class="name">var <span class="ident">content</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The content of the message.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@property
-def content(self) -&gt; str:
-    &#34;&#34;&#34;The content of the message.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    return self.message.content</code></pre>
-</details>
-</dd>
-<dt id="kasai.events.PrivMessageCreateEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
-<dd>
-<div class="desc"><p>The message that was sent.</p></div>
+<div class="desc"><p>The base client application.</p></div>
 </dd>
 </dl>
-<h3>Inherited members</h3>
-<ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
-<ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
-</ul>
-</li>
-</ul>
 </dd>
 <dt id="kasai.events.TimeoutEvent"><code class="flex name class">
 <span>class <span class="ident">TimeoutEvent</span></span>
-<span>(</span><span>*, app: traits.RESTAware, message: ModActionMessage)</span>
+<span>(</span><span>*, channel: kasai.Channel, created_at: dt.datetime, user: kasai.User, duration: int)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass created whenever a timeout command is sent to the
-Twitch channel. All instance attributes must be passed to the
-constructor on creation.</p>
+<div class="desc"><p>Event fired when a user is timed out from a chat channel.</p>
 <p>Method generated by attrs for class TimeoutEvent.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class TimeoutEvent(KasaiEvent):
-    &#34;&#34;&#34;A dataclass created whenever a timeout command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
-    &#34;&#34;&#34;
+<pre><code class="python">@attr.define(kw_only=True, weakref_slot=False)
+class TimeoutEvent(ModActionEvent):
+    &#34;&#34;&#34;Event fired when a user is timed out from a chat channel.&#34;&#34;&#34;
 
-    message: ModActionMessage
-    &#34;&#34;&#34;A representation of a CLEARCHAT message.&#34;&#34;&#34;
+    user: kasai.User = attr.field()
+    &#34;&#34;&#34;The user that was banned.&#34;&#34;&#34;
 
-    @property
-    def target_id(self) -&gt; str:
-        &#34;&#34;&#34;The target user&#39;s ID.
-
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
-
-        assert self.message.target_id is not None
-        return self.message.target_id
+    duration: int = attr.field()
+    &#34;&#34;&#34;The duration of the timeout, in seconds.&#34;&#34;&#34;
 
     @property
-    def duration(self) -&gt; int:
-        &#34;&#34;&#34;The timeout duration.
-
-        Returns
-        -------
-        builtins.int
-        &#34;&#34;&#34;
-
-        return self.message.duration</code></pre>
+    def user_id(self) -&gt; str:
+        &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+        return self.user.id</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></li>
 <li><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></li>
 <li>hikari.events.base_events.Event</li>
 <li>abc.ABC</li>
@@ -862,63 +1046,34 @@ class TimeoutEvent(KasaiEvent):
 <dl>
 <dt id="kasai.events.TimeoutEvent.duration"><code class="name">var <span class="ident">duration</span> : int</code></dt>
 <dd>
-<div class="desc"><p>The timeout duration.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.int</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>The duration of the timeout, in seconds.</p></div>
+</dd>
+<dt id="kasai.events.TimeoutEvent.user"><code class="name">var <span class="ident">user</span> : <a title="kasai.users.User" href="users.html#kasai.users.User">User</a></code></dt>
+<dd>
+<div class="desc"><p>The user that was banned.</p></div>
+</dd>
+<dt id="kasai.events.TimeoutEvent.user_id"><code class="name">var <span class="ident">user_id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The ID of the user that was banned.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def duration(self) -&gt; int:
-    &#34;&#34;&#34;The timeout duration.
-
-    Returns
-    -------
-    builtins.int
-    &#34;&#34;&#34;
-
-    return self.message.duration</code></pre>
-</details>
-</dd>
-<dt id="kasai.events.TimeoutEvent.message"><code class="name">var <span class="ident">message</span></code></dt>
-<dd>
-<div class="desc"><p>A representation of a CLEARCHAT message.</p></div>
-</dd>
-<dt id="kasai.events.TimeoutEvent.target_id"><code class="name">var <span class="ident">target_id</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The target user's ID.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@property
-def target_id(self) -&gt; str:
-    &#34;&#34;&#34;The target user&#39;s ID.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    assert self.message.target_id is not None
-    return self.message.target_id</code></pre>
+def user_id(self) -&gt; str:
+    &#34;&#34;&#34;The ID of the user that was banned.&#34;&#34;&#34;
+    return self.user.id</code></pre>
 </details>
 </dd>
 </dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
-<li><code><b><a title="kasai.events.KasaiEvent" href="#kasai.events.KasaiEvent">KasaiEvent</a></b></code>:
+<li><code><b><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></b></code>:
 <ul class="hlist">
-<li><code><a title="kasai.events.KasaiEvent.app" href="#kasai.events.KasaiEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.app" href="#kasai.events.ModActionEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel" href="#kasai.events.ModActionEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel_id" href="#kasai.events.ModActionEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.created_at" href="#kasai.events.ModActionEvent.created_at">created_at</a></code></li>
 </ul>
 </li>
 </ul>
@@ -988,21 +1143,29 @@ setTimeout(() => input.focus(), 100);
 <li>
 <h4><code><a title="kasai.events.BanEvent" href="#kasai.events.BanEvent">BanEvent</a></code></h4>
 <ul class="">
-<li><code><a title="kasai.events.BanEvent.message" href="#kasai.events.BanEvent.message">message</a></code></li>
-<li><code><a title="kasai.events.BanEvent.target_id" href="#kasai.events.BanEvent.target_id">target_id</a></code></li>
+<li><code><a title="kasai.events.BanEvent.user" href="#kasai.events.BanEvent.user">user</a></code></li>
+<li><code><a title="kasai.events.BanEvent.user_id" href="#kasai.events.BanEvent.user_id">user_id</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="kasai.events.ClearEvent" href="#kasai.events.ClearEvent">ClearEvent</a></code></h4>
-<ul class="">
-<li><code><a title="kasai.events.ClearEvent.message" href="#kasai.events.ClearEvent.message">message</a></code></li>
-</ul>
 </li>
 <li>
 <h4><code><a title="kasai.events.JoinEvent" href="#kasai.events.JoinEvent">JoinEvent</a></code></h4>
 <ul class="">
-<li><code><a title="kasai.events.JoinEvent.channel_name" href="#kasai.events.JoinEvent.channel_name">channel_name</a></code></li>
-<li><code><a title="kasai.events.JoinEvent.message" href="#kasai.events.JoinEvent.message">message</a></code></li>
+<li><code><a title="kasai.events.JoinEvent.app" href="#kasai.events.JoinEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.JoinEvent.channel" href="#kasai.events.JoinEvent.channel">channel</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="kasai.events.JoinRoomstateEvent" href="#kasai.events.JoinRoomstateEvent">JoinRoomstateEvent</a></code></h4>
+<ul class="two-column">
+<li><code><a title="kasai.events.JoinRoomstateEvent.app" href="#kasai.events.JoinRoomstateEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.JoinRoomstateEvent.channel" href="#kasai.events.JoinRoomstateEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.JoinRoomstateEvent.channel_id" href="#kasai.events.JoinRoomstateEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.JoinRoomstateEvent.game" href="#kasai.events.JoinRoomstateEvent.game">game</a></code></li>
+<li><code><a title="kasai.events.JoinRoomstateEvent.game_id" href="#kasai.events.JoinRoomstateEvent.game_id">game_id</a></code></li>
+<li><code><a title="kasai.events.JoinRoomstateEvent.title" href="#kasai.events.JoinRoomstateEvent.title">title</a></code></li>
 </ul>
 </li>
 <li>
@@ -1012,30 +1175,46 @@ setTimeout(() => input.focus(), 100);
 </ul>
 </li>
 <li>
+<h4><code><a title="kasai.events.MessageCreateEvent" href="#kasai.events.MessageCreateEvent">MessageCreateEvent</a></code></h4>
+<ul class="two-column">
+<li><code><a title="kasai.events.MessageCreateEvent.app" href="#kasai.events.MessageCreateEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.author" href="#kasai.events.MessageCreateEvent.author">author</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.author_id" href="#kasai.events.MessageCreateEvent.author_id">author_id</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.bits" href="#kasai.events.MessageCreateEvent.bits">bits</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.channel" href="#kasai.events.MessageCreateEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.channel_id" href="#kasai.events.MessageCreateEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.content" href="#kasai.events.MessageCreateEvent.content">content</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.message" href="#kasai.events.MessageCreateEvent.message">message</a></code></li>
+<li><code><a title="kasai.events.MessageCreateEvent.message_id" href="#kasai.events.MessageCreateEvent.message_id">message_id</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="kasai.events.ModActionEvent" href="#kasai.events.ModActionEvent">ModActionEvent</a></code></h4>
+<ul class="">
+<li><code><a title="kasai.events.ModActionEvent.app" href="#kasai.events.ModActionEvent.app">app</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel" href="#kasai.events.ModActionEvent.channel">channel</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.channel_id" href="#kasai.events.ModActionEvent.channel_id">channel_id</a></code></li>
+<li><code><a title="kasai.events.ModActionEvent.created_at" href="#kasai.events.ModActionEvent.created_at">created_at</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="kasai.events.PartEvent" href="#kasai.events.PartEvent">PartEvent</a></code></h4>
 <ul class="">
-<li><code><a title="kasai.events.PartEvent.channel_name" href="#kasai.events.PartEvent.channel_name">channel_name</a></code></li>
-<li><code><a title="kasai.events.PartEvent.message" href="#kasai.events.PartEvent.message">message</a></code></li>
+<li><code><a title="kasai.events.PartEvent.channel" href="#kasai.events.PartEvent.channel">channel</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="kasai.events.PingEvent" href="#kasai.events.PingEvent">PingEvent</a></code></h4>
-</li>
-<li>
-<h4><code><a title="kasai.events.PrivMessageCreateEvent" href="#kasai.events.PrivMessageCreateEvent">PrivMessageCreateEvent</a></code></h4>
 <ul class="">
-<li><code><a title="kasai.events.PrivMessageCreateEvent.author" href="#kasai.events.PrivMessageCreateEvent.author">author</a></code></li>
-<li><code><a title="kasai.events.PrivMessageCreateEvent.channel" href="#kasai.events.PrivMessageCreateEvent.channel">channel</a></code></li>
-<li><code><a title="kasai.events.PrivMessageCreateEvent.content" href="#kasai.events.PrivMessageCreateEvent.content">content</a></code></li>
-<li><code><a title="kasai.events.PrivMessageCreateEvent.message" href="#kasai.events.PrivMessageCreateEvent.message">message</a></code></li>
+<li><code><a title="kasai.events.PingEvent.app" href="#kasai.events.PingEvent.app">app</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="kasai.events.TimeoutEvent" href="#kasai.events.TimeoutEvent">TimeoutEvent</a></code></h4>
 <ul class="">
 <li><code><a title="kasai.events.TimeoutEvent.duration" href="#kasai.events.TimeoutEvent.duration">duration</a></code></li>
-<li><code><a title="kasai.events.TimeoutEvent.message" href="#kasai.events.TimeoutEvent.message">message</a></code></li>
-<li><code><a title="kasai.events.TimeoutEvent.target_id" href="#kasai.events.TimeoutEvent.target_id">target_id</a></code></li>
+<li><code><a title="kasai.events.TimeoutEvent.user" href="#kasai.events.TimeoutEvent.user">user</a></code></li>
+<li><code><a title="kasai.events.TimeoutEvent.user_id" href="#kasai.events.TimeoutEvent.user_id">user_id</a></code></li>
 </ul>
 </li>
 </ul>

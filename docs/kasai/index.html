@@ -69,23 +69,27 @@ dotenv.load_dotenv()
 bot = kasai.GatewayBot(
     os.environ[&quot;TOKEN&quot;],
     os.environ[&quot;IRC_TOKEN&quot;],
+    os.environ[&quot;TWITCH_CLIENT_ID&quot;],
+    os.environ[&quot;TWITCH_CLIENT_SECRET&quot;],
 )
+
+@bot.listen(hikari.StartedEvent)
+async def on_started(event):
+    await bot.twitch.join(os.environ[&quot;TWITCH_CHANNEL_NAME&quot;])
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def on_message(event):
-    if event.content == &quot;!start&quot;:
-        # Start listening for messages.
-        await bot.start_irc(&quot;#channel1&quot;, &quot;#channel2&quot;)
-
-    elif event.content == &quot;!close&quot;:
-        # Stop listening for messages.
-        await bot.close_irc()
-
-    elif event.content.startswith(&quot;!send&quot;):
+    if event.content.startswith(&quot;!send&quot;):
         # Send a message to Twitch chat.
-        await bot.twitch.create_message(&quot;#channel1&quot;, event.content[6:])
+        channel = await bot.twitch.fetch_channel(os.environ[&quot;TWITCH_CHANNEL_ID&quot;])
+        await channel.send(event.content[6:])
 
-@bot.listen(kasai.PrivMessageCreateEvent)
+@bot.listen(kasai.JoinRoomstateEvent)
+async def on_join_roomstate(event):
+    # Get information about the channel you just joined.
+    print(f&quot;Joined #{event.channel.name}, playing {event.game.name}&quot;)
+
+@bot.listen(kasai.MessageCreateEvent)
 async def on_twitch_message(event):
     # Display message information.
     print(f&quot;{event.author.name} said {event.content} in {event.channel.name}&quot;)
@@ -147,6 +151,9 @@ __bugtracker__ = &#34;https://github.com/parafoxia/hikari-kasai/issues&#34;
 __ci__ = &#34;https://github.com/parafoxia/hikari-kasai/actions&#34;
 __changelog__ = &#34;https://github.com/parafoxia/hikari-kasai/releases&#34;
 
+TWITCH_HELIX_URI = &#34;https://api.twitch.tv/helix/&#34;
+TWITCH_TOKEN_URI = &#34;https://id.twitch.tv/oauth2/token&#34;  # nosec: B105
+
 from pathlib import Path
 
 readme = Path(__file__).parent.parent / &#34;README.md&#34;
@@ -163,6 +170,7 @@ from kasai.channels import *
 from kasai.errors import *
 from kasai.events import *
 from kasai.messages import *
+from kasai.traits import *
 from kasai.twitch import *
 from kasai.users import *</code></pre>
 </details>
@@ -178,6 +186,10 @@ from kasai.users import *</code></pre>
 <dd>
 <div class="desc"></div>
 </dd>
+<dt><code class="name"><a title="kasai.entity_factory" href="entity_factory.html">kasai.entity_factory</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
 <dt><code class="name"><a title="kasai.errors" href="errors.html">kasai.errors</a></code></dt>
 <dd>
 <div class="desc"></div>
@@ -187,6 +199,10 @@ from kasai.users import *</code></pre>
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="kasai.messages" href="messages.html">kasai.messages</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="kasai.traits" href="traits.html">kasai.traits</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -273,9 +289,11 @@ setTimeout(() => input.focus(), 100);
 <ul>
 <li><code><a title="kasai.bot" href="bot.html">kasai.bot</a></code></li>
 <li><code><a title="kasai.channels" href="channels.html">kasai.channels</a></code></li>
+<li><code><a title="kasai.entity_factory" href="entity_factory.html">kasai.entity_factory</a></code></li>
 <li><code><a title="kasai.errors" href="errors.html">kasai.errors</a></code></li>
 <li><code><a title="kasai.events" href="events.html">kasai.events</a></code></li>
 <li><code><a title="kasai.messages" href="messages.html">kasai.messages</a></code></li>
+<li><code><a title="kasai.traits" href="traits.html">kasai.traits</a></code></li>
 <li><code><a title="kasai.twitch" href="twitch.html">kasai.twitch</a></code></li>
 <li><code><a title="kasai.users" href="users.html">kasai.users</a></code></li>
 <li><code><a title="kasai.ux" href="ux.html">kasai.ux</a></code></li>

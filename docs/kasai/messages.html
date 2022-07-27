@@ -56,236 +56,68 @@
 
 from __future__ import annotations
 
-__all__ = (&#34;PrivMessage&#34;, &#34;JoinMessage&#34;, &#34;PartMessage&#34;, &#34;ModActionMessage&#34;)
+__all__ = (&#34;Message&#34;,)
 
 import datetime as dt
-import enum
-import re
 
 import attr
+from hikari.internal import attr_extensions
 
 import kasai
-from kasai.users import UserType
-
-_PRIV_PATTERN = re.compile(r&#34;:[^#]*([^ ]*) :(.*)&#34;)
+from kasai import traits
 
 
+@attr_extensions.with_copy
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
-class PrivMessage:
-    &#34;&#34;&#34;A dataclass representing a PRIVMSG message. All attributes must
-    be passed to the constructor on creation, though you should never
-    need to create this yourself.
-    &#34;&#34;&#34;
+class Message:
+    &#34;&#34;&#34;A class representing a Twitch IRC PRIVMSG.&#34;&#34;&#34;
 
-    id: str
-    &#34;&#34;&#34;The message&#39;s unique ID.&#34;&#34;&#34;
+    app: traits.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
 
-    author: kasai.User
-    &#34;&#34;&#34;The author of the message.&#34;&#34;&#34;
+    id: str = attr.field(hash=True, repr=True)
+    &#34;&#34;&#34;This message&#39;s ID.&#34;&#34;&#34;
 
-    channel: kasai.Channel
-    &#34;&#34;&#34;The channel the message was sent in.&#34;&#34;&#34;
+    author: kasai.Viewer = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The user who sent this message.&#34;&#34;&#34;
 
-    created_at: dt.datetime
-    &#34;&#34;&#34;The date and time the message was sent.&#34;&#34;&#34;
+    channel: kasai.Channel = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The channel this message was sent to..&#34;&#34;&#34;
 
-    bits: int
-    &#34;&#34;&#34;The number of bits cheered in the message.&#34;&#34;&#34;
+    created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The date and time this message was sent.&#34;&#34;&#34;
 
-    content: str
-    &#34;&#34;&#34;The content of the message.&#34;&#34;&#34;
+    bits: int = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The number of bits the user sent in this message.&#34;&#34;&#34;
 
-    @classmethod
-    def new(cls, data: str) -&gt; PrivMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
+    content: str = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The text content of this message.&#34;&#34;&#34;
 
-        .. note::
-            The message data *must* be decoded before being passed.
+    async def respond(self, content: str) -&gt; None:
+        &#34;&#34;&#34;Send a message to this channel this message was sent to.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
+        ```
 
         Parameters
         ----------
-        data : builtins.str
-            The raw (decoded) message data.
+        content : str
+            The text content of the message you want to send.
 
         Returns
         -------
-        kasai.messages.PrivMessage
+        None
         &#34;&#34;&#34;
 
-        tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-        match = _PRIV_PATTERN.match(message)
-        assert match
-        channel, content = match.groups()
-
-        attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-
-        return cls(
-            id=attrs[&#34;id&#34;],
-            author=kasai.User(
-                id=attrs[&#34;user-id&#34;],
-                color=int(attrs[&#34;color&#34;][1:] or &#34;0&#34;, base=16),
-                display_name=attrs[&#34;display-name&#34;],
-                is_mod=bool(int(attrs[&#34;mod&#34;])),
-                is_subscriber=bool(int(attrs[&#34;subscriber&#34;])),
-                is_turbo=bool(int(attrs[&#34;turbo&#34;])),
-                is_broadcaster=&#34;broadcaster&#34; in attrs[&#34;badges&#34;],
-                type=UserType(attrs[&#34;user-type&#34;]),
-            ),
-            channel=kasai.Channel(
-                id=attrs[&#34;room-id&#34;],
-                name=channel,
-            ),
-            created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-            bits=int(attrs.get(&#34;bits&#34;, 0)),
-            content=content,
-        )
-
-
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class JoinMessage:
-    &#34;&#34;&#34;A dataclass representing a JOIN message. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
-    &#34;&#34;&#34;
-
-    channel_name: str
-    &#34;&#34;&#34;The name of the channel which was joined.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; JoinMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.JoinMessage
-        &#34;&#34;&#34;
-
-        channel = data.split()[-1]
-        return cls(channel_name=channel)
-
-
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class PartMessage:
-    &#34;&#34;&#34;A dataclass representing a PART message. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
-    &#34;&#34;&#34;
-
-    channel_name: str
-    &#34;&#34;&#34;The name of the channel which was joined.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; PartMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.PartMessage
-        &#34;&#34;&#34;
-
-        channel = data.split()[-1]
-        return cls(channel_name=channel)
-
-
-class ModCommandType(enum.Enum):
-    CLEAR = 0
-    BAN = 1
-    TIMEOUT = 2
-
-
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class ModActionMessage:
-    &#34;&#34;&#34;A dataclass representing a CLEARCHAT message. All attributes must
-    be passed to the constructor on creation, though you should never
-    need to create this yourself.
-
-    .. important::
-        This is triggered whenever a mod in your chat executes one of
-        the following moderation actions:
-
-        * /clear
-        * /ban
-        * /timeout
-
-        This is always sent as a CLEARCHAT message regardless of the
-        action taken. Action reasons are also not collected by this
-        class.
-    &#34;&#34;&#34;
-
-    target_id: str | None
-    &#34;&#34;&#34;The target user&#39;s ID. This is `None` if a clear command was
-    sent.&#34;&#34;&#34;
-
-    channel: kasai.Channel
-    &#34;&#34;&#34;The channel the command was executed in.&#34;&#34;&#34;
-
-    created_at: dt.datetime
-    &#34;&#34;&#34;The time the command was executed.&#34;&#34;&#34;
-
-    command: ModCommandType
-    &#34;&#34;&#34;The command that was executed.&#34;&#34;&#34;
-
-    duration: int
-    &#34;&#34;&#34;The duration of the action. This is only non-zero if the command
-    was a timeout, in which case it will be the number of seconds the
-    user is timed out for.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; ModActionMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.ModActionMessage
-        &#34;&#34;&#34;
-
-        tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-        channel = message.split()[2]
-
-        attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-        keys = attrs.keys()
-
-        if &#34;ban-duration&#34; in keys:
-            cmd = ModCommandType.TIMEOUT
-        elif &#34;target-user-id&#34; in keys:
-            cmd = ModCommandType.BAN
-        else:
-            cmd = ModCommandType.CLEAR
-
-        return cls(
-            target_id=attrs.get(&#34;target-user-id&#34;, None),
-            channel=kasai.Channel(
-                id=attrs[&#34;room-id&#34;],
-                name=channel,
-            ),
-            created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-            command=cmd,
-            duration=int(attrs.get(&#34;ban-duration&#34;, 0)),
-        )</code></pre>
+        await self.app.twitch.create_message(self.channel.username, content)</code></pre>
 </details>
 </section>
 <section>
@@ -297,581 +129,145 @@ class ModActionMessage:
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="kasai.messages.JoinMessage"><code class="flex name class">
-<span>class <span class="ident">JoinMessage</span></span>
-<span>(</span><span>*, channel_name: str)</span>
+<dt id="kasai.messages.Message"><code class="flex name class">
+<span>class <span class="ident">Message</span></span>
+<span>(</span><span>*, app: traits.TwitchAware, id: str, author: kasai.Viewer, channel: kasai.Channel, created_at: dt.datetime, bits: int, content: str)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass representing a JOIN message. All attributes must be
-passed to the constructor on creation, though you should never need
-to create this yourself.</p>
-<p>Method generated by attrs for class JoinMessage.</p></div>
+<div class="desc"><p>A class representing a Twitch IRC PRIVMSG.</p>
+<p>Method generated by attrs for class Message.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class JoinMessage:
-    &#34;&#34;&#34;A dataclass representing a JOIN message. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
-    &#34;&#34;&#34;
+<pre><code class="python">@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class Message:
+    &#34;&#34;&#34;A class representing a Twitch IRC PRIVMSG.&#34;&#34;&#34;
 
-    channel_name: str
-    &#34;&#34;&#34;The name of the channel which was joined.&#34;&#34;&#34;
+    app: traits.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
 
-    @classmethod
-    def new(cls, data: str) -&gt; JoinMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
+    id: str = attr.field(hash=True, repr=True)
+    &#34;&#34;&#34;This message&#39;s ID.&#34;&#34;&#34;
 
-        .. note::
-            The message data *must* be decoded before being passed.
+    author: kasai.Viewer = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The user who sent this message.&#34;&#34;&#34;
+
+    channel: kasai.Channel = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The channel this message was sent to..&#34;&#34;&#34;
+
+    created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The date and time this message was sent.&#34;&#34;&#34;
+
+    bits: int = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The number of bits the user sent in this message.&#34;&#34;&#34;
+
+    content: str = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;The text content of this message.&#34;&#34;&#34;
+
+    async def respond(self, content: str) -&gt; None:
+        &#34;&#34;&#34;Send a message to this channel this message was sent to.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
+        ```
 
         Parameters
         ----------
-        data : builtins.str
-            The raw (decoded) message data.
+        content : str
+            The text content of the message you want to send.
 
         Returns
         -------
-        kasai.messages.JoinMessage
+        None
         &#34;&#34;&#34;
 
-        channel = data.split()[-1]
-        return cls(channel_name=channel)</code></pre>
+        await self.app.twitch.create_message(self.channel.username, content)</code></pre>
 </details>
-<h3>Static methods</h3>
+<h3>Instance variables</h3>
 <dl>
-<dt id="kasai.messages.JoinMessage.new"><code class="name flex">
-<span>def <span class="ident">new</span></span>(<span>data: str) ‑> <a title="kasai.messages.JoinMessage" href="#kasai.messages.JoinMessage">JoinMessage</a></span>
+<dt id="kasai.messages.Message.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
+<dd>
+<div class="desc"><p>The base client application.</p></div>
+</dd>
+<dt id="kasai.messages.Message.author"><code class="name">var <span class="ident">author</span> : <a title="kasai.users.Viewer" href="users.html#kasai.users.Viewer">Viewer</a></code></dt>
+<dd>
+<div class="desc"><p>The user who sent this message.</p></div>
+</dd>
+<dt id="kasai.messages.Message.bits"><code class="name">var <span class="ident">bits</span> : int</code></dt>
+<dd>
+<div class="desc"><p>The number of bits the user sent in this message.</p></div>
+</dd>
+<dt id="kasai.messages.Message.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
+<dd>
+<div class="desc"><p>The channel this message was sent to..</p></div>
+</dd>
+<dt id="kasai.messages.Message.content"><code class="name">var <span class="ident">content</span> : str</code></dt>
+<dd>
+<div class="desc"><p>The text content of this message.</p></div>
+</dd>
+<dt id="kasai.messages.Message.created_at"><code class="name">var <span class="ident">created_at</span> : datetime.datetime</code></dt>
+<dd>
+<div class="desc"><p>The date and time this message was sent.</p></div>
+</dd>
+<dt id="kasai.messages.Message.id"><code class="name">var <span class="ident">id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>This message's ID.</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="kasai.messages.Message.respond"><code class="name flex">
+<span>async def <span class="ident">respond</span></span>(<span>self, content: str) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Create a new instance from raw (decoded) message data.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The message data <em>must</em> be decoded before being passed.</p>
-</div>
+<div class="desc"><p>Send a message to this channel this message was sent to.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await message.respond(&quot;Never gonna give you up!&quot;)
+</code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>data</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The raw (decoded) message data.</dd>
+<dt><strong><code>content</code></strong> :&ensp;<code>str</code></dt>
+<dd>The text content of the message you want to send.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt><code><a title="kasai.messages.JoinMessage" href="#kasai.messages.JoinMessage">JoinMessage</a></code></dt>
+<dt><code>None</code></dt>
 <dd>&nbsp;</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@classmethod
-def new(cls, data: str) -&gt; JoinMessage:
-    &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
+<pre><code class="python">async def respond(self, content: str) -&gt; None:
+    &#34;&#34;&#34;Send a message to this channel this message was sent to.
 
-    .. note::
-        The message data *must* be decoded before being passed.
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
+    ```
 
     Parameters
     ----------
-    data : builtins.str
-        The raw (decoded) message data.
+    content : str
+        The text content of the message you want to send.
 
     Returns
     -------
-    kasai.messages.JoinMessage
+    None
     &#34;&#34;&#34;
 
-    channel = data.split()[-1]
-    return cls(channel_name=channel)</code></pre>
+    await self.app.twitch.create_message(self.channel.username, content)</code></pre>
 </details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="kasai.messages.JoinMessage.channel_name"><code class="name">var <span class="ident">channel_name</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The name of the channel which was joined.</p></div>
-</dd>
-</dl>
-</dd>
-<dt id="kasai.messages.ModActionMessage"><code class="flex name class">
-<span>class <span class="ident">ModActionMessage</span></span>
-<span>(</span><span>*, target_id: str | None, channel: kasai.Channel, created_at: dt.datetime, command: ModCommandType, duration: int)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A dataclass representing a CLEARCHAT message. All attributes must
-be passed to the constructor on creation, though you should never
-need to create this yourself.</p>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>This is triggered whenever a mod in your chat executes one of
-the following moderation actions:</p>
-<ul>
-<li>/clear</li>
-<li>/ban</li>
-<li>/timeout</li>
-</ul>
-<p>This is always sent as a CLEARCHAT message regardless of the
-action taken. Action reasons are also not collected by this
-class.</p>
-</div>
-<p>Method generated by attrs for class ModActionMessage.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class ModActionMessage:
-    &#34;&#34;&#34;A dataclass representing a CLEARCHAT message. All attributes must
-    be passed to the constructor on creation, though you should never
-    need to create this yourself.
-
-    .. important::
-        This is triggered whenever a mod in your chat executes one of
-        the following moderation actions:
-
-        * /clear
-        * /ban
-        * /timeout
-
-        This is always sent as a CLEARCHAT message regardless of the
-        action taken. Action reasons are also not collected by this
-        class.
-    &#34;&#34;&#34;
-
-    target_id: str | None
-    &#34;&#34;&#34;The target user&#39;s ID. This is `None` if a clear command was
-    sent.&#34;&#34;&#34;
-
-    channel: kasai.Channel
-    &#34;&#34;&#34;The channel the command was executed in.&#34;&#34;&#34;
-
-    created_at: dt.datetime
-    &#34;&#34;&#34;The time the command was executed.&#34;&#34;&#34;
-
-    command: ModCommandType
-    &#34;&#34;&#34;The command that was executed.&#34;&#34;&#34;
-
-    duration: int
-    &#34;&#34;&#34;The duration of the action. This is only non-zero if the command
-    was a timeout, in which case it will be the number of seconds the
-    user is timed out for.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; ModActionMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.ModActionMessage
-        &#34;&#34;&#34;
-
-        tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-        channel = message.split()[2]
-
-        attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-        keys = attrs.keys()
-
-        if &#34;ban-duration&#34; in keys:
-            cmd = ModCommandType.TIMEOUT
-        elif &#34;target-user-id&#34; in keys:
-            cmd = ModCommandType.BAN
-        else:
-            cmd = ModCommandType.CLEAR
-
-        return cls(
-            target_id=attrs.get(&#34;target-user-id&#34;, None),
-            channel=kasai.Channel(
-                id=attrs[&#34;room-id&#34;],
-                name=channel,
-            ),
-            created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-            command=cmd,
-            duration=int(attrs.get(&#34;ban-duration&#34;, 0)),
-        )</code></pre>
-</details>
-<h3>Static methods</h3>
-<dl>
-<dt id="kasai.messages.ModActionMessage.new"><code class="name flex">
-<span>def <span class="ident">new</span></span>(<span>data: str) ‑> <a title="kasai.messages.ModActionMessage" href="#kasai.messages.ModActionMessage">ModActionMessage</a></span>
-</code></dt>
-<dd>
-<div class="desc"><p>Create a new instance from raw (decoded) message data.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The message data <em>must</em> be decoded before being passed.</p>
-</div>
-<h2 id="parameters">Parameters</h2>
-<dl>
-<dt><strong><code>data</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The raw (decoded) message data.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code><a title="kasai.messages.ModActionMessage" href="#kasai.messages.ModActionMessage">ModActionMessage</a></code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@classmethod
-def new(cls, data: str) -&gt; ModActionMessage:
-    &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-    .. note::
-        The message data *must* be decoded before being passed.
-
-    Parameters
-    ----------
-    data : builtins.str
-        The raw (decoded) message data.
-
-    Returns
-    -------
-    kasai.messages.ModActionMessage
-    &#34;&#34;&#34;
-
-    tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-    channel = message.split()[2]
-
-    attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-    keys = attrs.keys()
-
-    if &#34;ban-duration&#34; in keys:
-        cmd = ModCommandType.TIMEOUT
-    elif &#34;target-user-id&#34; in keys:
-        cmd = ModCommandType.BAN
-    else:
-        cmd = ModCommandType.CLEAR
-
-    return cls(
-        target_id=attrs.get(&#34;target-user-id&#34;, None),
-        channel=kasai.Channel(
-            id=attrs[&#34;room-id&#34;],
-            name=channel,
-        ),
-        created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-        command=cmd,
-        duration=int(attrs.get(&#34;ban-duration&#34;, 0)),
-    )</code></pre>
-</details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="kasai.messages.ModActionMessage.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
-<dd>
-<div class="desc"><p>The channel the command was executed in.</p></div>
-</dd>
-<dt id="kasai.messages.ModActionMessage.command"><code class="name">var <span class="ident">command</span> : kasai.messages.ModCommandType</code></dt>
-<dd>
-<div class="desc"><p>The command that was executed.</p></div>
-</dd>
-<dt id="kasai.messages.ModActionMessage.created_at"><code class="name">var <span class="ident">created_at</span> : datetime.datetime</code></dt>
-<dd>
-<div class="desc"><p>The time the command was executed.</p></div>
-</dd>
-<dt id="kasai.messages.ModActionMessage.duration"><code class="name">var <span class="ident">duration</span> : int</code></dt>
-<dd>
-<div class="desc"><p>The duration of the action. This is only non-zero if the command
-was a timeout, in which case it will be the number of seconds the
-user is timed out for.</p></div>
-</dd>
-<dt id="kasai.messages.ModActionMessage.target_id"><code class="name">var <span class="ident">target_id</span> : str | None</code></dt>
-<dd>
-<div class="desc"><p>The target user's ID. This is <code>None</code> if a clear command was
-sent.</p></div>
-</dd>
-</dl>
-</dd>
-<dt id="kasai.messages.PartMessage"><code class="flex name class">
-<span>class <span class="ident">PartMessage</span></span>
-<span>(</span><span>*, channel_name: str)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A dataclass representing a PART message. All attributes must be
-passed to the constructor on creation, though you should never need
-to create this yourself.</p>
-<p>Method generated by attrs for class PartMessage.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class PartMessage:
-    &#34;&#34;&#34;A dataclass representing a PART message. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
-    &#34;&#34;&#34;
-
-    channel_name: str
-    &#34;&#34;&#34;The name of the channel which was joined.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; PartMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.PartMessage
-        &#34;&#34;&#34;
-
-        channel = data.split()[-1]
-        return cls(channel_name=channel)</code></pre>
-</details>
-<h3>Static methods</h3>
-<dl>
-<dt id="kasai.messages.PartMessage.new"><code class="name flex">
-<span>def <span class="ident">new</span></span>(<span>data: str) ‑> <a title="kasai.messages.PartMessage" href="#kasai.messages.PartMessage">PartMessage</a></span>
-</code></dt>
-<dd>
-<div class="desc"><p>Create a new instance from raw (decoded) message data.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The message data <em>must</em> be decoded before being passed.</p>
-</div>
-<h2 id="parameters">Parameters</h2>
-<dl>
-<dt><strong><code>data</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The raw (decoded) message data.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code><a title="kasai.messages.PartMessage" href="#kasai.messages.PartMessage">PartMessage</a></code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@classmethod
-def new(cls, data: str) -&gt; PartMessage:
-    &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-    .. note::
-        The message data *must* be decoded before being passed.
-
-    Parameters
-    ----------
-    data : builtins.str
-        The raw (decoded) message data.
-
-    Returns
-    -------
-    kasai.messages.PartMessage
-    &#34;&#34;&#34;
-
-    channel = data.split()[-1]
-    return cls(channel_name=channel)</code></pre>
-</details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="kasai.messages.PartMessage.channel_name"><code class="name">var <span class="ident">channel_name</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The name of the channel which was joined.</p></div>
-</dd>
-</dl>
-</dd>
-<dt id="kasai.messages.PrivMessage"><code class="flex name class">
-<span>class <span class="ident">PrivMessage</span></span>
-<span>(</span><span>*, id: str, author: kasai.User, channel: kasai.Channel, created_at: dt.datetime, bits: int, content: str)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A dataclass representing a PRIVMSG message. All attributes must
-be passed to the constructor on creation, though you should never
-need to create this yourself.</p>
-<p>Method generated by attrs for class PrivMessage.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class PrivMessage:
-    &#34;&#34;&#34;A dataclass representing a PRIVMSG message. All attributes must
-    be passed to the constructor on creation, though you should never
-    need to create this yourself.
-    &#34;&#34;&#34;
-
-    id: str
-    &#34;&#34;&#34;The message&#39;s unique ID.&#34;&#34;&#34;
-
-    author: kasai.User
-    &#34;&#34;&#34;The author of the message.&#34;&#34;&#34;
-
-    channel: kasai.Channel
-    &#34;&#34;&#34;The channel the message was sent in.&#34;&#34;&#34;
-
-    created_at: dt.datetime
-    &#34;&#34;&#34;The date and time the message was sent.&#34;&#34;&#34;
-
-    bits: int
-    &#34;&#34;&#34;The number of bits cheered in the message.&#34;&#34;&#34;
-
-    content: str
-    &#34;&#34;&#34;The content of the message.&#34;&#34;&#34;
-
-    @classmethod
-    def new(cls, data: str) -&gt; PrivMessage:
-        &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-        .. note::
-            The message data *must* be decoded before being passed.
-
-        Parameters
-        ----------
-        data : builtins.str
-            The raw (decoded) message data.
-
-        Returns
-        -------
-        kasai.messages.PrivMessage
-        &#34;&#34;&#34;
-
-        tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-        match = _PRIV_PATTERN.match(message)
-        assert match
-        channel, content = match.groups()
-
-        attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-
-        return cls(
-            id=attrs[&#34;id&#34;],
-            author=kasai.User(
-                id=attrs[&#34;user-id&#34;],
-                color=int(attrs[&#34;color&#34;][1:] or &#34;0&#34;, base=16),
-                display_name=attrs[&#34;display-name&#34;],
-                is_mod=bool(int(attrs[&#34;mod&#34;])),
-                is_subscriber=bool(int(attrs[&#34;subscriber&#34;])),
-                is_turbo=bool(int(attrs[&#34;turbo&#34;])),
-                is_broadcaster=&#34;broadcaster&#34; in attrs[&#34;badges&#34;],
-                type=UserType(attrs[&#34;user-type&#34;]),
-            ),
-            channel=kasai.Channel(
-                id=attrs[&#34;room-id&#34;],
-                name=channel,
-            ),
-            created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-            bits=int(attrs.get(&#34;bits&#34;, 0)),
-            content=content,
-        )</code></pre>
-</details>
-<h3>Static methods</h3>
-<dl>
-<dt id="kasai.messages.PrivMessage.new"><code class="name flex">
-<span>def <span class="ident">new</span></span>(<span>data: str) ‑> <a title="kasai.messages.PrivMessage" href="#kasai.messages.PrivMessage">PrivMessage</a></span>
-</code></dt>
-<dd>
-<div class="desc"><p>Create a new instance from raw (decoded) message data.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The message data <em>must</em> be decoded before being passed.</p>
-</div>
-<h2 id="parameters">Parameters</h2>
-<dl>
-<dt><strong><code>data</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The raw (decoded) message data.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code><a title="kasai.messages.PrivMessage" href="#kasai.messages.PrivMessage">PrivMessage</a></code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@classmethod
-def new(cls, data: str) -&gt; PrivMessage:
-    &#34;&#34;&#34;Create a new instance from raw (decoded) message data.
-
-    .. note::
-        The message data *must* be decoded before being passed.
-
-    Parameters
-    ----------
-    data : builtins.str
-        The raw (decoded) message data.
-
-    Returns
-    -------
-    kasai.messages.PrivMessage
-    &#34;&#34;&#34;
-
-    tags, message = data[1:].split(&#34; &#34;, maxsplit=1)
-    match = _PRIV_PATTERN.match(message)
-    assert match
-    channel, content = match.groups()
-
-    attrs = {(kv := attr.split(&#34;=&#34;))[0]: kv[1] for attr in tags.split(&#34;;&#34;)}
-
-    return cls(
-        id=attrs[&#34;id&#34;],
-        author=kasai.User(
-            id=attrs[&#34;user-id&#34;],
-            color=int(attrs[&#34;color&#34;][1:] or &#34;0&#34;, base=16),
-            display_name=attrs[&#34;display-name&#34;],
-            is_mod=bool(int(attrs[&#34;mod&#34;])),
-            is_subscriber=bool(int(attrs[&#34;subscriber&#34;])),
-            is_turbo=bool(int(attrs[&#34;turbo&#34;])),
-            is_broadcaster=&#34;broadcaster&#34; in attrs[&#34;badges&#34;],
-            type=UserType(attrs[&#34;user-type&#34;]),
-        ),
-        channel=kasai.Channel(
-            id=attrs[&#34;room-id&#34;],
-            name=channel,
-        ),
-        created_at=dt.datetime.fromtimestamp(int(attrs[&#34;tmi-sent-ts&#34;]) / 1000),
-        bits=int(attrs.get(&#34;bits&#34;, 0)),
-        content=content,
-    )</code></pre>
-</details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="kasai.messages.PrivMessage.author"><code class="name">var <span class="ident">author</span> : <a title="kasai.users.User" href="users.html#kasai.users.User">User</a></code></dt>
-<dd>
-<div class="desc"><p>The author of the message.</p></div>
-</dd>
-<dt id="kasai.messages.PrivMessage.bits"><code class="name">var <span class="ident">bits</span> : int</code></dt>
-<dd>
-<div class="desc"><p>The number of bits cheered in the message.</p></div>
-</dd>
-<dt id="kasai.messages.PrivMessage.channel"><code class="name">var <span class="ident">channel</span> : <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></code></dt>
-<dd>
-<div class="desc"><p>The channel the message was sent in.</p></div>
-</dd>
-<dt id="kasai.messages.PrivMessage.content"><code class="name">var <span class="ident">content</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The content of the message.</p></div>
-</dd>
-<dt id="kasai.messages.PrivMessage.created_at"><code class="name">var <span class="ident">created_at</span> : datetime.datetime</code></dt>
-<dd>
-<div class="desc"><p>The date and time the message was sent.</p></div>
-</dd>
-<dt id="kasai.messages.PrivMessage.id"><code class="name">var <span class="ident">id</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The message's unique ID.</p></div>
 </dd>
 </dl>
 </dd>
@@ -938,40 +334,16 @@ setTimeout(() => input.focus(), 100);
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="kasai.messages.JoinMessage" href="#kasai.messages.JoinMessage">JoinMessage</a></code></h4>
-<ul class="">
-<li><code><a title="kasai.messages.JoinMessage.channel_name" href="#kasai.messages.JoinMessage.channel_name">channel_name</a></code></li>
-<li><code><a title="kasai.messages.JoinMessage.new" href="#kasai.messages.JoinMessage.new">new</a></code></li>
-</ul>
-</li>
-<li>
-<h4><code><a title="kasai.messages.ModActionMessage" href="#kasai.messages.ModActionMessage">ModActionMessage</a></code></h4>
+<h4><code><a title="kasai.messages.Message" href="#kasai.messages.Message">Message</a></code></h4>
 <ul class="two-column">
-<li><code><a title="kasai.messages.ModActionMessage.channel" href="#kasai.messages.ModActionMessage.channel">channel</a></code></li>
-<li><code><a title="kasai.messages.ModActionMessage.command" href="#kasai.messages.ModActionMessage.command">command</a></code></li>
-<li><code><a title="kasai.messages.ModActionMessage.created_at" href="#kasai.messages.ModActionMessage.created_at">created_at</a></code></li>
-<li><code><a title="kasai.messages.ModActionMessage.duration" href="#kasai.messages.ModActionMessage.duration">duration</a></code></li>
-<li><code><a title="kasai.messages.ModActionMessage.new" href="#kasai.messages.ModActionMessage.new">new</a></code></li>
-<li><code><a title="kasai.messages.ModActionMessage.target_id" href="#kasai.messages.ModActionMessage.target_id">target_id</a></code></li>
-</ul>
-</li>
-<li>
-<h4><code><a title="kasai.messages.PartMessage" href="#kasai.messages.PartMessage">PartMessage</a></code></h4>
-<ul class="">
-<li><code><a title="kasai.messages.PartMessage.channel_name" href="#kasai.messages.PartMessage.channel_name">channel_name</a></code></li>
-<li><code><a title="kasai.messages.PartMessage.new" href="#kasai.messages.PartMessage.new">new</a></code></li>
-</ul>
-</li>
-<li>
-<h4><code><a title="kasai.messages.PrivMessage" href="#kasai.messages.PrivMessage">PrivMessage</a></code></h4>
-<ul class="two-column">
-<li><code><a title="kasai.messages.PrivMessage.author" href="#kasai.messages.PrivMessage.author">author</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.bits" href="#kasai.messages.PrivMessage.bits">bits</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.channel" href="#kasai.messages.PrivMessage.channel">channel</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.content" href="#kasai.messages.PrivMessage.content">content</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.created_at" href="#kasai.messages.PrivMessage.created_at">created_at</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.id" href="#kasai.messages.PrivMessage.id">id</a></code></li>
-<li><code><a title="kasai.messages.PrivMessage.new" href="#kasai.messages.PrivMessage.new">new</a></code></li>
+<li><code><a title="kasai.messages.Message.app" href="#kasai.messages.Message.app">app</a></code></li>
+<li><code><a title="kasai.messages.Message.author" href="#kasai.messages.Message.author">author</a></code></li>
+<li><code><a title="kasai.messages.Message.bits" href="#kasai.messages.Message.bits">bits</a></code></li>
+<li><code><a title="kasai.messages.Message.channel" href="#kasai.messages.Message.channel">channel</a></code></li>
+<li><code><a title="kasai.messages.Message.content" href="#kasai.messages.Message.content">content</a></code></li>
+<li><code><a title="kasai.messages.Message.created_at" href="#kasai.messages.Message.created_at">created_at</a></code></li>
+<li><code><a title="kasai.messages.Message.id" href="#kasai.messages.Message.id">id</a></code></li>
+<li><code><a title="kasai.messages.Message.respond" href="#kasai.messages.Message.respond">respond</a></code></li>
 </ul>
 </li>
 </ul>

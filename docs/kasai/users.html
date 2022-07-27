@@ -56,11 +56,16 @@
 
 from __future__ import annotations
 
-__all__ = (&#34;User&#34;,)
+__all__ = (&#34;User&#34;, &#34;Viewer&#34;)
 
+import abc
+import datetime as dt
 import enum
 
 import attr
+from hikari.internal import attr_extensions
+
+from kasai import traits
 
 
 class UserType(enum.Enum):
@@ -76,67 +81,164 @@ class UserType(enum.Enum):
     &#34;&#34;&#34;&#34;&#34;&#34;
 
 
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class User:
-    &#34;&#34;&#34;A dataclass representing a Twitch user. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
+class User(abc.ABC):
+    &#34;&#34;&#34;A class representing a Twitch user.&#34;&#34;&#34;
 
-    .. note::
-        This does not necessarily represent a global user. The values
-        of some attributes are dependent on context, often the channel
-        the user was in when they sent a message.
-    &#34;&#34;&#34;
-
-    id: str
-    &#34;&#34;&#34;The user&#39;s ID.&#34;&#34;&#34;
-
-    color: int
-    &#34;&#34;&#34;The user&#39;s colour in the current context. This is an integer
-    representation of the colour&#39;s hex code.&#34;&#34;&#34;
-
-    display_name: str
-    &#34;&#34;&#34;The user&#39;s display name.&#34;&#34;&#34;
-
-    is_mod: bool
-    &#34;&#34;&#34;Whether the user is a mod in the current context.&#34;&#34;&#34;
-
-    is_subscriber: bool
-    &#34;&#34;&#34;Whether the user is a subscriber in the current context.&#34;&#34;&#34;
-
-    is_turbo: bool
-    &#34;&#34;&#34;Whether the user has ads turned off globally.&#34;&#34;&#34;
-
-    is_broadcaster: bool
-    &#34;&#34;&#34;Whether the user is the broadcaster.&#34;&#34;&#34;
-
-    type: UserType
-    &#34;&#34;&#34;The user type. This will be :obj:`UserType.NORMAL` unless the
-    user works for Twitch.&#34;&#34;&#34;
+    __slots__ = ()
 
     @property
+    @abc.abstractmethod
+    def app(self) -&gt; traits.TwitchAware:
+        &#34;&#34;&#34;Client application that models may use for procedures.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def broadcaster_type(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def description(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def display_name(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def id(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
     def username(self) -&gt; str:
-        &#34;&#34;&#34;The user&#39;s username. This is always their display name in
-        all lower case.
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
+    @property
+    @abc.abstractmethod
+    def offline_image_url(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        return self.display_name.lower()
+    @property
+    @abc.abstractmethod
+    def profile_image_url(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def type(self) -&gt; UserType:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def created_at(self) -&gt; dt.datetime:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+
+class Viewer(User, abc.ABC):
+    &#34;&#34;&#34;A class representing a Twitch viewer.
+
+    This is largely the same as a normal `User`, but contains additional
+    information related to the user&#39;s relationship with the channel
+    they&#39;re currently viewing.
+    &#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def color(self) -&gt; int:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
     @property
     def colour(self) -&gt; int:
-        &#34;&#34;&#34;An alias for those who can spell correctly. This is an
-        integer representation of the colour&#39;s hex code.
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+        return self.color
 
-        Returns
-        -------
-        builtins.int
-        &#34;&#34;&#34;
+    @property
+    @abc.abstractmethod
+    def is_mod(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        return self.color</code></pre>
+    @property
+    @abc.abstractmethod
+    def is_subscriber(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def is_turbo(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def is_broadcaster(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class UserImpl(User):
+    &#34;&#34;&#34;Concrete implementation of user information.&#34;&#34;&#34;
+
+    app: traits.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    &#34;&#34;&#34;The client application that models may use for procedures.&#34;&#34;&#34;
+
+    broadcaster_type: str = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    description: str = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    display_name: str = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    id: str = attr.field(hash=True, repr=True)
+    &#34;&#34;&#34;The ID of this user.&#34;&#34;&#34;
+
+    username: str = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    offline_image_url: str = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    profile_image_url: str = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    type: UserType = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    def __str__(self) -&gt; str:
+        return self.username
+
+
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class ViewerImpl(UserImpl, Viewer):
+    &#34;&#34;&#34;Concrete implementation of viewer information.&#34;&#34;&#34;
+
+    color: int = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    is_mod: bool = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    is_subscriber: bool = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    is_turbo: bool = attr.field(eq=False, hash=False, repr=False)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;
+
+    is_broadcaster: bool = attr.field(eq=False, hash=False, repr=True)
+    &#34;&#34;&#34;An attribute.&#34;&#34;&#34;</code></pre>
 </details>
 </section>
 <section>
@@ -150,174 +252,368 @@ class User:
 <dl>
 <dt id="kasai.users.User"><code class="flex name class">
 <span>class <span class="ident">User</span></span>
-<span>(</span><span>*, id: str, color: int, display_name: str, is_mod: bool, is_subscriber: bool, is_turbo: bool, is_broadcaster: bool, type: UserType)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A dataclass representing a Twitch user. All attributes must be
-passed to the constructor on creation, though you should never need
-to create this yourself.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This does not necessarily represent a global user. The values
-of some attributes are dependent on context, often the channel
-the user was in when they sent a message.</p>
-</div>
-<p>Method generated by attrs for class User.</p></div>
+<div class="desc"><p>A class representing a Twitch user.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class User:
-    &#34;&#34;&#34;A dataclass representing a Twitch user. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
+<pre><code class="python">class User(abc.ABC):
+    &#34;&#34;&#34;A class representing a Twitch user.&#34;&#34;&#34;
 
-    .. note::
-        This does not necessarily represent a global user. The values
-        of some attributes are dependent on context, often the channel
-        the user was in when they sent a message.
-    &#34;&#34;&#34;
-
-    id: str
-    &#34;&#34;&#34;The user&#39;s ID.&#34;&#34;&#34;
-
-    color: int
-    &#34;&#34;&#34;The user&#39;s colour in the current context. This is an integer
-    representation of the colour&#39;s hex code.&#34;&#34;&#34;
-
-    display_name: str
-    &#34;&#34;&#34;The user&#39;s display name.&#34;&#34;&#34;
-
-    is_mod: bool
-    &#34;&#34;&#34;Whether the user is a mod in the current context.&#34;&#34;&#34;
-
-    is_subscriber: bool
-    &#34;&#34;&#34;Whether the user is a subscriber in the current context.&#34;&#34;&#34;
-
-    is_turbo: bool
-    &#34;&#34;&#34;Whether the user has ads turned off globally.&#34;&#34;&#34;
-
-    is_broadcaster: bool
-    &#34;&#34;&#34;Whether the user is the broadcaster.&#34;&#34;&#34;
-
-    type: UserType
-    &#34;&#34;&#34;The user type. This will be :obj:`UserType.NORMAL` unless the
-    user works for Twitch.&#34;&#34;&#34;
+    __slots__ = ()
 
     @property
+    @abc.abstractmethod
+    def app(self) -&gt; traits.TwitchAware:
+        &#34;&#34;&#34;Client application that models may use for procedures.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def broadcaster_type(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def description(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def display_name(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def id(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
     def username(self) -&gt; str:
-        &#34;&#34;&#34;The user&#39;s username. This is always their display name in
-        all lower case.
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        Returns
-        -------
-        builtins.str
-        &#34;&#34;&#34;
+    @property
+    @abc.abstractmethod
+    def offline_image_url(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        return self.display_name.lower()
+    @property
+    @abc.abstractmethod
+    def profile_image_url(self) -&gt; str:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def type(self) -&gt; UserType:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def created_at(self) -&gt; dt.datetime:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>abc.ABC</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li>kasai.users.UserImpl</li>
+<li><a title="kasai.users.Viewer" href="#kasai.users.Viewer">Viewer</a></li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="kasai.users.User.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.traits.TwitchAware" href="traits.html#kasai.traits.TwitchAware">TwitchAware</a></code></dt>
+<dd>
+<div class="desc"><p>Client application that models may use for procedures.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def app(self) -&gt; traits.TwitchAware:
+    &#34;&#34;&#34;Client application that models may use for procedures.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.broadcaster_type"><code class="name">var <span class="ident">broadcaster_type</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def broadcaster_type(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.created_at"><code class="name">var <span class="ident">created_at</span> : datetime.datetime</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def created_at(self) -&gt; dt.datetime:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.description"><code class="name">var <span class="ident">description</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def description(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.display_name"><code class="name">var <span class="ident">display_name</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def display_name(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.id"><code class="name">var <span class="ident">id</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def id(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.offline_image_url"><code class="name">var <span class="ident">offline_image_url</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def offline_image_url(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.profile_image_url"><code class="name">var <span class="ident">profile_image_url</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def profile_image_url(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.type"><code class="name">var <span class="ident">type</span> : kasai.users.UserType</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def type(self) -&gt; UserType:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.User.username"><code class="name">var <span class="ident">username</span> : str</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def username(self) -&gt; str:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="kasai.users.Viewer"><code class="flex name class">
+<span>class <span class="ident">Viewer</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class representing a Twitch viewer.</p>
+<p>This is largely the same as a normal <code><a title="kasai.users.User" href="#kasai.users.User">User</a></code>, but contains additional
+information related to the user's relationship with the channel
+they're currently viewing.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Viewer(User, abc.ABC):
+    &#34;&#34;&#34;A class representing a Twitch viewer.
+
+    This is largely the same as a normal `User`, but contains additional
+    information related to the user&#39;s relationship with the channel
+    they&#39;re currently viewing.
+    &#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def color(self) -&gt; int:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
     @property
     def colour(self) -&gt; int:
-        &#34;&#34;&#34;An alias for those who can spell correctly. This is an
-        integer representation of the colour&#39;s hex code.
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+        return self.color
 
-        Returns
-        -------
-        builtins.int
-        &#34;&#34;&#34;
+    @property
+    @abc.abstractmethod
+    def is_mod(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
 
-        return self.color</code></pre>
+    @property
+    @abc.abstractmethod
+    def is_subscriber(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def is_turbo(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;
+
+    @property
+    @abc.abstractmethod
+    def is_broadcaster(self) -&gt; bool:
+        &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
 </details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="kasai.users.User" href="#kasai.users.User">User</a></li>
+<li>abc.ABC</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li>kasai.users.ViewerImpl</li>
+</ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.users.User.color"><code class="name">var <span class="ident">color</span> : int</code></dt>
+<dt id="kasai.users.Viewer.color"><code class="name">var <span class="ident">color</span> : int</code></dt>
 <dd>
-<div class="desc"><p>The user's colour in the current context. This is an integer
-representation of the colour's hex code.</p></div>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def color(self) -&gt; int:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
 </dd>
-<dt id="kasai.users.User.colour"><code class="name">var <span class="ident">colour</span> : int</code></dt>
+<dt id="kasai.users.Viewer.colour"><code class="name">var <span class="ident">colour</span> : int</code></dt>
 <dd>
-<div class="desc"><p>An alias for those who can spell correctly. This is an
-integer representation of the colour's hex code.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.int</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>A property.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
 def colour(self) -&gt; int:
-    &#34;&#34;&#34;An alias for those who can spell correctly. This is an
-    integer representation of the colour&#39;s hex code.
-
-    Returns
-    -------
-    builtins.int
-    &#34;&#34;&#34;
-
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;
     return self.color</code></pre>
 </details>
 </dd>
-<dt id="kasai.users.User.display_name"><code class="name">var <span class="ident">display_name</span> : str</code></dt>
+<dt id="kasai.users.Viewer.is_broadcaster"><code class="name">var <span class="ident">is_broadcaster</span> : bool</code></dt>
 <dd>
-<div class="desc"><p>The user's display name.</p></div>
-</dd>
-<dt id="kasai.users.User.id"><code class="name">var <span class="ident">id</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The user's ID.</p></div>
-</dd>
-<dt id="kasai.users.User.is_broadcaster"><code class="name">var <span class="ident">is_broadcaster</span> : bool</code></dt>
-<dd>
-<div class="desc"><p>Whether the user is the broadcaster.</p></div>
-</dd>
-<dt id="kasai.users.User.is_mod"><code class="name">var <span class="ident">is_mod</span> : bool</code></dt>
-<dd>
-<div class="desc"><p>Whether the user is a mod in the current context.</p></div>
-</dd>
-<dt id="kasai.users.User.is_subscriber"><code class="name">var <span class="ident">is_subscriber</span> : bool</code></dt>
-<dd>
-<div class="desc"><p>Whether the user is a subscriber in the current context.</p></div>
-</dd>
-<dt id="kasai.users.User.is_turbo"><code class="name">var <span class="ident">is_turbo</span> : bool</code></dt>
-<dd>
-<div class="desc"><p>Whether the user has ads turned off globally.</p></div>
-</dd>
-<dt id="kasai.users.User.type"><code class="name">var <span class="ident">type</span> : kasai.users.UserType</code></dt>
-<dd>
-<div class="desc"><p>The user type. This will be :obj:<code>UserType.NORMAL</code> unless the
-user works for Twitch.</p></div>
-</dd>
-<dt id="kasai.users.User.username"><code class="name">var <span class="ident">username</span> : str</code></dt>
-<dd>
-<div class="desc"><p>The user's username. This is always their display name in
-all lower case.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.str</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>A property.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def username(self) -&gt; str:
-    &#34;&#34;&#34;The user&#39;s username. This is always their display name in
-    all lower case.
-
-    Returns
-    -------
-    builtins.str
-    &#34;&#34;&#34;
-
-    return self.display_name.lower()</code></pre>
+@abc.abstractmethod
+def is_broadcaster(self) -&gt; bool:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.Viewer.is_mod"><code class="name">var <span class="ident">is_mod</span> : bool</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def is_mod(self) -&gt; bool:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.Viewer.is_subscriber"><code class="name">var <span class="ident">is_subscriber</span> : bool</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def is_subscriber(self) -&gt; bool:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="kasai.users.Viewer.is_turbo"><code class="name">var <span class="ident">is_turbo</span> : bool</code></dt>
+<dd>
+<div class="desc"><p>A property.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+@abc.abstractmethod
+def is_turbo(self) -&gt; bool:
+    &#34;&#34;&#34;A property.&#34;&#34;&#34;</code></pre>
 </details>
 </dd>
 </dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="kasai.users.User" href="#kasai.users.User">User</a></b></code>:
+<ul class="hlist">
+<li><code><a title="kasai.users.User.app" href="#kasai.users.User.app">app</a></code></li>
+<li><code><a title="kasai.users.User.broadcaster_type" href="#kasai.users.User.broadcaster_type">broadcaster_type</a></code></li>
+<li><code><a title="kasai.users.User.created_at" href="#kasai.users.User.created_at">created_at</a></code></li>
+<li><code><a title="kasai.users.User.description" href="#kasai.users.User.description">description</a></code></li>
+<li><code><a title="kasai.users.User.display_name" href="#kasai.users.User.display_name">display_name</a></code></li>
+<li><code><a title="kasai.users.User.id" href="#kasai.users.User.id">id</a></code></li>
+<li><code><a title="kasai.users.User.offline_image_url" href="#kasai.users.User.offline_image_url">offline_image_url</a></code></li>
+<li><code><a title="kasai.users.User.profile_image_url" href="#kasai.users.User.profile_image_url">profile_image_url</a></code></li>
+<li><code><a title="kasai.users.User.type" href="#kasai.users.User.type">type</a></code></li>
+<li><code><a title="kasai.users.User.username" href="#kasai.users.User.username">username</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
 </dl>
 </section>
@@ -384,16 +680,27 @@ setTimeout(() => input.focus(), 100);
 <li>
 <h4><code><a title="kasai.users.User" href="#kasai.users.User">User</a></code></h4>
 <ul class="two-column">
-<li><code><a title="kasai.users.User.color" href="#kasai.users.User.color">color</a></code></li>
-<li><code><a title="kasai.users.User.colour" href="#kasai.users.User.colour">colour</a></code></li>
+<li><code><a title="kasai.users.User.app" href="#kasai.users.User.app">app</a></code></li>
+<li><code><a title="kasai.users.User.broadcaster_type" href="#kasai.users.User.broadcaster_type">broadcaster_type</a></code></li>
+<li><code><a title="kasai.users.User.created_at" href="#kasai.users.User.created_at">created_at</a></code></li>
+<li><code><a title="kasai.users.User.description" href="#kasai.users.User.description">description</a></code></li>
 <li><code><a title="kasai.users.User.display_name" href="#kasai.users.User.display_name">display_name</a></code></li>
 <li><code><a title="kasai.users.User.id" href="#kasai.users.User.id">id</a></code></li>
-<li><code><a title="kasai.users.User.is_broadcaster" href="#kasai.users.User.is_broadcaster">is_broadcaster</a></code></li>
-<li><code><a title="kasai.users.User.is_mod" href="#kasai.users.User.is_mod">is_mod</a></code></li>
-<li><code><a title="kasai.users.User.is_subscriber" href="#kasai.users.User.is_subscriber">is_subscriber</a></code></li>
-<li><code><a title="kasai.users.User.is_turbo" href="#kasai.users.User.is_turbo">is_turbo</a></code></li>
+<li><code><a title="kasai.users.User.offline_image_url" href="#kasai.users.User.offline_image_url">offline_image_url</a></code></li>
+<li><code><a title="kasai.users.User.profile_image_url" href="#kasai.users.User.profile_image_url">profile_image_url</a></code></li>
 <li><code><a title="kasai.users.User.type" href="#kasai.users.User.type">type</a></code></li>
 <li><code><a title="kasai.users.User.username" href="#kasai.users.User.username">username</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="kasai.users.Viewer" href="#kasai.users.Viewer">Viewer</a></code></h4>
+<ul class="two-column">
+<li><code><a title="kasai.users.Viewer.color" href="#kasai.users.Viewer.color">color</a></code></li>
+<li><code><a title="kasai.users.Viewer.colour" href="#kasai.users.Viewer.colour">colour</a></code></li>
+<li><code><a title="kasai.users.Viewer.is_broadcaster" href="#kasai.users.Viewer.is_broadcaster">is_broadcaster</a></code></li>
+<li><code><a title="kasai.users.Viewer.is_mod" href="#kasai.users.Viewer.is_mod">is_mod</a></code></li>
+<li><code><a title="kasai.users.Viewer.is_subscriber" href="#kasai.users.Viewer.is_subscriber">is_subscriber</a></code></li>
+<li><code><a title="kasai.users.Viewer.is_turbo" href="#kasai.users.Viewer.is_turbo">is_turbo</a></code></li>
 </ul>
 </li>
 </ul>

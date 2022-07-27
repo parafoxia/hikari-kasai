@@ -59,10 +59,15 @@ from __future__ import annotations
 __all__ = (&#34;TwitchClient&#34;,)
 
 import asyncio
+import datetime as dt
 import logging
 import socket
+import typing as t
 from hashlib import sha256
 from time import time
+
+import aiohttp
+from hikari.internal.data_binding import JSONObject
 
 import kasai
 
@@ -70,25 +75,45 @@ _log = logging.getLogger(__name__)
 
 
 class TwitchClient:
-    &#34;&#34;&#34;A class for interacting with Twitch. This is available through
-    :obj:`kasai.bot.GatewayBot.twitch`, and should never need to be
-    manually instantiated.
+    &#34;&#34;&#34;A class representing a Twitch client.
 
     Parameters
     ----------
-    bot : kasai.bot.GatewayBot
-        The Discord bot instance.
-    token : builtins.str
-        Your Twitch IRC token
+    app : kasai.GatewayBot
+        The base client application.
+    irc_token : str
+        Your Twitch IRC access token. This is different to an API access
+        token.
+    client_id : str
+        Your Twitch application&#39;s client ID.
+    client_secret : str
+        Your Twitch application&#39;s client secret.
     &#34;&#34;&#34;
 
-    __slots__ = (&#34;bot&#34;, &#34;_token&#34;, &#34;_nickname&#34;, &#34;_channels&#34;, &#34;_sock&#34;, &#34;_task&#34;)
+    __slots__ = (
+        &#34;_app&#34;,
+        &#34;_irc_token&#34;,
+        &#34;_client_id&#34;,
+        &#34;_client_secret&#34;,
+        &#34;_api_token&#34;,
+        &#34;_session&#34;,
+        &#34;_nickname&#34;,
+        &#34;_channels&#34;,
+        &#34;_sock&#34;,
+        &#34;_task&#34;,
+    )
 
-    def __init__(self, bot: kasai.GatewayBot, token: str) -&gt; None:
-        self.bot = bot
-        &#34;&#34;&#34;The Discord bot instance.&#34;&#34;&#34;
+    def __init__(
+        self, app: kasai.GatewayBot, irc_token: str, client_id: str, client_secret: str
+    ) -&gt; None:
+        self._app = app
 
-        self._token = token
+        self._irc_token = irc_token
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._api_token: str | None = None
+        self._session: aiohttp.ClientSession | None = None
+
         self._nickname = sha256(f&#34;{time()}&#34;.encode(&#34;utf-8&#34;)).hexdigest()[:7]
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
@@ -96,156 +121,385 @@ class TwitchClient:
 
     @property
     def is_alive(self) -&gt; bool:
-        &#34;&#34;&#34;Whether the websocket is open. This does not necessarily mean
-        it&#39;s connected to a channel.
+        &#34;&#34;&#34;Whether the client is connected to the Twitch Helix API. This
+        does not necessarily mean the client is connected to the Twitch
+        IRC servers.&#34;&#34;&#34;
 
-        Returns
-        -------
-        builtins.bool
-        &#34;&#34;&#34;
-
-        return self._sock is not None
+        return self._session is not None and not self._session.closed
 
     @property
-    def channels(self) -&gt; list[str]:
-        &#34;&#34;&#34;A list of channels the client is connected to.
+    def is_authorised(self) -&gt; bool:
+        &#34;&#34;&#34;Whether the client is authorised to connect to the Twitch
+        Helix API.&#34;&#34;&#34;
+
+        return self._api_token is not None
+
+    @property
+    def app(self) -&gt; kasai.GatewayBot:
+        &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
+
+        return self._app
+
+    @staticmethod
+    def _transform_tags(tags: str) -&gt; dict[str, str]:
+        return {(kv := tag.split(&#34;=&#34;))[0]: kv[1] for tag in tags[1:].split(&#34;;&#34;)}
+
+    async def _request(
+        self,
+        method: str,
+        route: str,
+        *,
+        options: dict[str, list[str]],
+    ) -&gt; list[JSONObject]:
+        if self._session is None:
+            raise kasai.NotAlive(&#34;there is no active API session&#34;)
+
+        query = &#34;?&#34;
+        for key, value in options.items():
+            query += &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value)
+
+        async with self._session.request(
+            method,
+            kasai.TWITCH_HELIX_URI + route + query,
+            headers={
+                &#34;Authorization&#34;: f&#34;Bearer {self._api_token}&#34;,
+                &#34;Client-Id&#34;: self._client_id,
+            },
+        ) as resp:
+            data = await resp.json()
+
+            if not resp.ok:
+                raise kasai.RequestFailed(data[&#34;status&#34;], data[&#34;message&#34;])
+
+        return t.cast(list[JSONObject], data[&#34;data&#34;])
+
+    async def _listen(self) -&gt; None:
+        assert self._sock
+        loop = asyncio.get_running_loop()
+
+        while True:
+            payload = (await loop.sock_recv(self._sock, 512)).decode(&#34;utf-8&#34;).strip()
+            _log.debug(f&#34;received IRC message: {payload}&#34;)
+
+            for data in payload.split(&#34;\n&#34;):
+                if data.startswith(&#34;@&#34;):
+                    raw_tags, message = data.split(&#34; &#34;, maxsplit=1)
+                    tags = self._transform_tags(raw_tags)
+                else:
+                    message = data
+                    tags = {}
+
+                if message.startswith(&#34;PING&#34;):
+                    await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
+                    self.app.dispatch(kasai.PingEvent(app=self.app))
+                    continue
+
+                if &#34;JOIN&#34; in message:
+                    self._channels.append(cn := message.split()[-1][1:])
+                    self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
+                    _log.info(f&#34;joined #{cn}&#34;)
+                    continue
+
+                if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
+                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                    self.app.dispatch(kasai.JoinRoomstateEvent(channel=channel))
+                    continue
+
+                if &#34;PART&#34; in message:
+                    self._channels.remove(cn := message.split()[-1][1:])
+                    self.app.dispatch(kasai.PartEvent(channel=cn, app=self.app))
+                    _log.info(f&#34;parted #{cn}&#34;)
+                    continue
+
+                if &#34;CLEARCHAT&#34; in message:
+                    event: kasai.ClearEvent | kasai.BanEvent | kasai.TimeoutEvent
+                    keys = tags.keys()
+
+                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                    created = dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000)
+
+                    if &#34;ban-duration&#34; in keys:
+                        event = kasai.TimeoutEvent(
+                            channel=channel,
+                            created_at=created,
+                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                            duration=int(tags.get(&#34;ban-duration&#34;, 0)),
+                        )
+                    elif &#34;target-user-id&#34; in keys:
+                        event = kasai.BanEvent(
+                            channel=channel,
+                            created_at=created,
+                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                        )
+                    else:
+                        event = kasai.ClearEvent(channel=channel, created_at=created)
+
+                    self.app.dispatch(event)
+                    continue
+
+                if &#34;PRIVMSG&#34; not in message:
+                    continue
+
+                user = message[(i := message.index(&#34;#&#34;) + 1) : message.index(&#34; &#34;, i)]
+                result = self.app.entity_factory.deserialize_twitch_message(
+                    message,
+                    tags,
+                    await self._fetch_viewer(user, tags=tags),
+                    await self.fetch_channel(tags[&#34;room-id&#34;]),
+                )
+                self.app.dispatch(kasai.MessageCreateEvent(message=result))
+
+    async def start(self) -&gt; None:
+        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
+        the Discord bot starts.
 
         Returns
         -------
-        builtins.list[builtins.str]
+        None
         &#34;&#34;&#34;
 
-        return self._channels
+        if self.is_alive:
+            raise kasai.IsAlive(&#34;a client session is already alive&#34;)
 
-    def _create_sock(self) -&gt; None:
+        # Enable API requests.
+        self._session = aiohttp.ClientSession()
+
+        async with self._session.post(
+            kasai.TWITCH_TOKEN_URI,
+            headers={&#34;Content-Type&#34;: &#34;application/x-www-form-urlencoded&#34;},
+            data={
+                &#34;client_id&#34;: self._client_id,
+                &#34;client_secret&#34;: self._client_secret,
+                &#34;grant_type&#34;: &#34;client_credentials&#34;,
+            },
+        ) as resp:
+            data = await resp.json()
+            self._api_token = data[&#34;access_token&#34;]
+
+        # Open an IRC websocket.
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
-    async def _irclisten(self, loop: asyncio.AbstractEventLoop) -&gt; None:
+        loop = asyncio.get_running_loop()
+        await loop.sock_connect(self._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
+        await loop.sock_sendall(
+            self._sock,
+            (
+                f&#34;PASS {self._irc_token}\r\nNICK {self._nickname}\r\n&#34;
+                &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+            ).encode(),
+        )
+
+        self._task = loop.create_task(self._listen())
+        self._task.add_done_callback(lambda task: task.result())
+
+        # Finish up.
+        _log.info(&#34;successfully started Twitch services&#34;)
+
+    async def close(self) -&gt; None:
+        &#34;&#34;&#34;Ends all Twitch services. This is called automatically when
+        the Discord bot shuts down.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
+
+        if not self.is_alive:
+            raise kasai.NotAlive(
+                &#34;Twitch services were never started, or have already been shut down&#34;
+            )
+
+        assert self._session
         assert self._sock
 
-        while True:
-            resp = await loop.sock_recv(self._sock, 512)
-            data = resp.decode(&#34;utf-8&#34;).strip()
-            _log.debug(f&#34;received IRC message: {data}&#34;)
+        await self.part(*self._channels)
+        await self._session.close()
+        self._sock.close()
+        self._sock = None
 
-            if resp.startswith(b&#34;PING&#34;):
-                await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
-                self.bot.dispatch(kasai.PingEvent(app=self.bot))
-                continue
+        if self._task and not self._task.cancelled():
+            self._task.cancel()
 
-            if b&#34;JOIN&#34; in resp:
-                join = kasai.JoinMessage.new(data)
-                self.bot.dispatch(kasai.JoinEvent(message=join, app=self.bot))
-                self._channels.append(join.channel_name)
-                _log.info(f&#34;joined {join.channel_name}&#34;)
-                continue
-
-            if b&#34;PART&#34; in resp:
-                part = kasai.PartMessage.new(data)
-                self.bot.dispatch(kasai.PartEvent(message=part, app=self.bot))
-                self._channels.remove(part.channel_name)
-                _log.info(f&#34;parted {part.channel_name}&#34;)
-                continue
-
-            if b&#34;CLEARCHAT&#34; in resp:
-                mod = kasai.ModActionMessage.new(data)
-                if mod.command.value == 0:
-                    self.bot.dispatch(kasai.ClearEvent(message=mod, app=self.bot))
-                elif mod.command.value == 1:
-                    self.bot.dispatch(kasai.BanEvent(message=mod, app=self.bot))
-                elif mod.command.value == 2:
-                    self.bot.dispatch(kasai.TimeoutEvent(message=mod, app=self.bot))
-                continue
-
-            if b&#34;PRIVMSG&#34; not in resp:
-                continue
-
-            pm = kasai.PrivMessage.new(data)
-            self.bot.dispatch(kasai.PrivMessageCreateEvent(message=pm, app=self.bot))
+        _log.info(&#34;successfully closed IRC websocket&#34;)
 
     async def join(self, *channels: str) -&gt; None:
-        &#34;&#34;&#34;Join a Twitch channel.
+        &#34;&#34;&#34;Joins the given Twitch channels&#39; chats.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        ```
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.join(*channels)
+        ```
 
         Parameters
         ----------
         *channels : str
-            The channels to join. This can be empty, in which case,
-            nothing will happen.
+            The login usernames of the channels to join.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to Twitch.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
 
         if not channels:
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;JOIN {c}&#34; for c in channels) + &#34;\r\n&#34;
+        msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
     async def part(self, *channels: str) -&gt; None:
-        &#34;&#34;&#34;Part (or leave) a Twitch channel.
+        &#34;&#34;&#34;Parts (leaves) the given Twitch channels&#39; chats.
+
+        .. note::
+            You do not need to part joined channels before shutting the
+            bot down — this is handled automatically.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        ```
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.part(*channels)
+        ```
 
         Parameters
         ----------
-        *channels : builtins.str
-            The channels to part. This can be empty, in which case,
-            nothing will happen.
+        *channels : str
+            The login usernames of the channels to part.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to Twitch.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+        if not channels:
+            return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;PART {c}&#34; for c in channels) + &#34;\r\n&#34;
+        msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
     async def create_message(self, channel: str, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to a given channel&#39;s chat. The client must
-        have joined that channel to send a message.
+        &#34;&#34;&#34;Send a message to a Twitch channel.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.create_message(
+            &#34;parafoxia&#34;,
+            &#34;Never gonna give you up!&#34;,
+        )
+        ```
 
         Parameters
         ----------
-        channel : builtins.str
-            The channel to send the message to. This must be prefixed
-            with a hash (#).
-        contents : builtins.str
-            The content of the message. The maximum allowed message
-            length varies on a number of factors, but generally,
-            messages should not be longer than about 400 characters.
+        channel : str
+            The login username of the channel you want to send a message
+            to.
+        content : str
+            The text content of the message you want to send.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to a Twitch channel.
-
-        kasai.errors.NotInChannel
-            The client has not joined the given channel.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections to send a message to&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+        channel = channel.strip(&#34;#&#34;)
 
         if channel not in self._channels:
-            raise kasai.NotInChannel(f&#34;the client is not connected to {channel}&#34;)
+            raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
         msg = (
             f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-            f&#34;PRIVMSG {channel} {content}\r\n&#34;
+            f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
         )
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+
+    async def fetch_user(self, user: str) -&gt; kasai.User:
+        &#34;&#34;&#34;Fetches a user from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
+        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+        &gt;&gt;&gt; user1 == user2
+        True
+        ```
+
+        Parameters
+        ----------
+        user : str
+            The login username or the ID of the user to fetch. Note that
+            while Twitch user IDs are numerical, they are strings.
+
+        Returns
+        -------
+        kasai.User
+            The fetched user.
+        &#34;&#34;&#34;
+
+        key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
+        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        return self.app.entity_factory.deserialize_twitch_user(payload[0])
+
+    async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
+        &#34;&#34;&#34;Fetches a channel from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+        &gt;&gt;&gt; print(channel.username)
+        parafoxia
+        ```
+
+        Parameters
+        ----------
+        channel : str
+            The ID of the channel to fetch. Note that while Twitch
+            channel IDs are numerical, they are strings. A channel&#39;s ID
+            is identical to the user ID of the channel.
+
+        Returns
+        -------
+        kasai.Channel
+            The fetched channel.
+        &#34;&#34;&#34;
+
+        payload = await self.app.twitch._request(
+            &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
+        )
+        return self.app.entity_factory.deserialize_twitch_channel(payload[0])
+
+    async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
+        key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
+        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
 </details>
 </section>
 <section>
@@ -259,43 +513,66 @@ class TwitchClient:
 <dl>
 <dt id="kasai.twitch.TwitchClient"><code class="flex name class">
 <span>class <span class="ident">TwitchClient</span></span>
-<span>(</span><span>bot: kasai.GatewayBot, token: str)</span>
+<span>(</span><span>app: kasai.GatewayBot, irc_token: str, client_id: str, client_secret: str)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A class for interacting with Twitch. This is available through
-:obj:<code><a title="kasai.bot.GatewayBot.twitch" href="bot.html#kasai.bot.GatewayBot.twitch">GatewayBot.twitch</a></code>, and should never need to be
-manually instantiated.</p>
+<div class="desc"><p>A class representing a Twitch client.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>bot</code></strong> :&ensp;<code><a title="kasai.bot.GatewayBot" href="bot.html#kasai.bot.GatewayBot">GatewayBot</a></code></dt>
-<dd>The Discord bot instance.</dd>
-<dt><strong><code>token</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>Your Twitch IRC token</dd>
+<dt><strong><code>app</code></strong> :&ensp;<code>kasai.GatewayBot</code></dt>
+<dd>The base client application.</dd>
+<dt><strong><code>irc_token</code></strong> :&ensp;<code>str</code></dt>
+<dd>Your Twitch IRC access token. This is different to an API access
+token.</dd>
+<dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>Your Twitch application's client ID.</dd>
+<dt><strong><code>client_secret</code></strong> :&ensp;<code>str</code></dt>
+<dd>Your Twitch application's client secret.</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class TwitchClient:
-    &#34;&#34;&#34;A class for interacting with Twitch. This is available through
-    :obj:`kasai.bot.GatewayBot.twitch`, and should never need to be
-    manually instantiated.
+    &#34;&#34;&#34;A class representing a Twitch client.
 
     Parameters
     ----------
-    bot : kasai.bot.GatewayBot
-        The Discord bot instance.
-    token : builtins.str
-        Your Twitch IRC token
+    app : kasai.GatewayBot
+        The base client application.
+    irc_token : str
+        Your Twitch IRC access token. This is different to an API access
+        token.
+    client_id : str
+        Your Twitch application&#39;s client ID.
+    client_secret : str
+        Your Twitch application&#39;s client secret.
     &#34;&#34;&#34;
 
-    __slots__ = (&#34;bot&#34;, &#34;_token&#34;, &#34;_nickname&#34;, &#34;_channels&#34;, &#34;_sock&#34;, &#34;_task&#34;)
+    __slots__ = (
+        &#34;_app&#34;,
+        &#34;_irc_token&#34;,
+        &#34;_client_id&#34;,
+        &#34;_client_secret&#34;,
+        &#34;_api_token&#34;,
+        &#34;_session&#34;,
+        &#34;_nickname&#34;,
+        &#34;_channels&#34;,
+        &#34;_sock&#34;,
+        &#34;_task&#34;,
+    )
 
-    def __init__(self, bot: kasai.GatewayBot, token: str) -&gt; None:
-        self.bot = bot
-        &#34;&#34;&#34;The Discord bot instance.&#34;&#34;&#34;
+    def __init__(
+        self, app: kasai.GatewayBot, irc_token: str, client_id: str, client_secret: str
+    ) -&gt; None:
+        self._app = app
 
-        self._token = token
+        self._irc_token = irc_token
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._api_token: str | None = None
+        self._session: aiohttp.ClientSession | None = None
+
         self._nickname = sha256(f&#34;{time()}&#34;.encode(&#34;utf-8&#34;)).hexdigest()[:7]
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
@@ -303,323 +580,722 @@ manually instantiated.</p>
 
     @property
     def is_alive(self) -&gt; bool:
-        &#34;&#34;&#34;Whether the websocket is open. This does not necessarily mean
-        it&#39;s connected to a channel.
+        &#34;&#34;&#34;Whether the client is connected to the Twitch Helix API. This
+        does not necessarily mean the client is connected to the Twitch
+        IRC servers.&#34;&#34;&#34;
 
-        Returns
-        -------
-        builtins.bool
-        &#34;&#34;&#34;
-
-        return self._sock is not None
+        return self._session is not None and not self._session.closed
 
     @property
-    def channels(self) -&gt; list[str]:
-        &#34;&#34;&#34;A list of channels the client is connected to.
+    def is_authorised(self) -&gt; bool:
+        &#34;&#34;&#34;Whether the client is authorised to connect to the Twitch
+        Helix API.&#34;&#34;&#34;
+
+        return self._api_token is not None
+
+    @property
+    def app(self) -&gt; kasai.GatewayBot:
+        &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
+
+        return self._app
+
+    @staticmethod
+    def _transform_tags(tags: str) -&gt; dict[str, str]:
+        return {(kv := tag.split(&#34;=&#34;))[0]: kv[1] for tag in tags[1:].split(&#34;;&#34;)}
+
+    async def _request(
+        self,
+        method: str,
+        route: str,
+        *,
+        options: dict[str, list[str]],
+    ) -&gt; list[JSONObject]:
+        if self._session is None:
+            raise kasai.NotAlive(&#34;there is no active API session&#34;)
+
+        query = &#34;?&#34;
+        for key, value in options.items():
+            query += &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value)
+
+        async with self._session.request(
+            method,
+            kasai.TWITCH_HELIX_URI + route + query,
+            headers={
+                &#34;Authorization&#34;: f&#34;Bearer {self._api_token}&#34;,
+                &#34;Client-Id&#34;: self._client_id,
+            },
+        ) as resp:
+            data = await resp.json()
+
+            if not resp.ok:
+                raise kasai.RequestFailed(data[&#34;status&#34;], data[&#34;message&#34;])
+
+        return t.cast(list[JSONObject], data[&#34;data&#34;])
+
+    async def _listen(self) -&gt; None:
+        assert self._sock
+        loop = asyncio.get_running_loop()
+
+        while True:
+            payload = (await loop.sock_recv(self._sock, 512)).decode(&#34;utf-8&#34;).strip()
+            _log.debug(f&#34;received IRC message: {payload}&#34;)
+
+            for data in payload.split(&#34;\n&#34;):
+                if data.startswith(&#34;@&#34;):
+                    raw_tags, message = data.split(&#34; &#34;, maxsplit=1)
+                    tags = self._transform_tags(raw_tags)
+                else:
+                    message = data
+                    tags = {}
+
+                if message.startswith(&#34;PING&#34;):
+                    await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
+                    self.app.dispatch(kasai.PingEvent(app=self.app))
+                    continue
+
+                if &#34;JOIN&#34; in message:
+                    self._channels.append(cn := message.split()[-1][1:])
+                    self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
+                    _log.info(f&#34;joined #{cn}&#34;)
+                    continue
+
+                if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
+                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                    self.app.dispatch(kasai.JoinRoomstateEvent(channel=channel))
+                    continue
+
+                if &#34;PART&#34; in message:
+                    self._channels.remove(cn := message.split()[-1][1:])
+                    self.app.dispatch(kasai.PartEvent(channel=cn, app=self.app))
+                    _log.info(f&#34;parted #{cn}&#34;)
+                    continue
+
+                if &#34;CLEARCHAT&#34; in message:
+                    event: kasai.ClearEvent | kasai.BanEvent | kasai.TimeoutEvent
+                    keys = tags.keys()
+
+                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                    created = dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000)
+
+                    if &#34;ban-duration&#34; in keys:
+                        event = kasai.TimeoutEvent(
+                            channel=channel,
+                            created_at=created,
+                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                            duration=int(tags.get(&#34;ban-duration&#34;, 0)),
+                        )
+                    elif &#34;target-user-id&#34; in keys:
+                        event = kasai.BanEvent(
+                            channel=channel,
+                            created_at=created,
+                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                        )
+                    else:
+                        event = kasai.ClearEvent(channel=channel, created_at=created)
+
+                    self.app.dispatch(event)
+                    continue
+
+                if &#34;PRIVMSG&#34; not in message:
+                    continue
+
+                user = message[(i := message.index(&#34;#&#34;) + 1) : message.index(&#34; &#34;, i)]
+                result = self.app.entity_factory.deserialize_twitch_message(
+                    message,
+                    tags,
+                    await self._fetch_viewer(user, tags=tags),
+                    await self.fetch_channel(tags[&#34;room-id&#34;]),
+                )
+                self.app.dispatch(kasai.MessageCreateEvent(message=result))
+
+    async def start(self) -&gt; None:
+        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
+        the Discord bot starts.
 
         Returns
         -------
-        builtins.list[builtins.str]
+        None
         &#34;&#34;&#34;
 
-        return self._channels
+        if self.is_alive:
+            raise kasai.IsAlive(&#34;a client session is already alive&#34;)
 
-    def _create_sock(self) -&gt; None:
+        # Enable API requests.
+        self._session = aiohttp.ClientSession()
+
+        async with self._session.post(
+            kasai.TWITCH_TOKEN_URI,
+            headers={&#34;Content-Type&#34;: &#34;application/x-www-form-urlencoded&#34;},
+            data={
+                &#34;client_id&#34;: self._client_id,
+                &#34;client_secret&#34;: self._client_secret,
+                &#34;grant_type&#34;: &#34;client_credentials&#34;,
+            },
+        ) as resp:
+            data = await resp.json()
+            self._api_token = data[&#34;access_token&#34;]
+
+        # Open an IRC websocket.
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
-    async def _irclisten(self, loop: asyncio.AbstractEventLoop) -&gt; None:
+        loop = asyncio.get_running_loop()
+        await loop.sock_connect(self._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
+        await loop.sock_sendall(
+            self._sock,
+            (
+                f&#34;PASS {self._irc_token}\r\nNICK {self._nickname}\r\n&#34;
+                &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+            ).encode(),
+        )
+
+        self._task = loop.create_task(self._listen())
+        self._task.add_done_callback(lambda task: task.result())
+
+        # Finish up.
+        _log.info(&#34;successfully started Twitch services&#34;)
+
+    async def close(self) -&gt; None:
+        &#34;&#34;&#34;Ends all Twitch services. This is called automatically when
+        the Discord bot shuts down.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
+
+        if not self.is_alive:
+            raise kasai.NotAlive(
+                &#34;Twitch services were never started, or have already been shut down&#34;
+            )
+
+        assert self._session
         assert self._sock
 
-        while True:
-            resp = await loop.sock_recv(self._sock, 512)
-            data = resp.decode(&#34;utf-8&#34;).strip()
-            _log.debug(f&#34;received IRC message: {data}&#34;)
+        await self.part(*self._channels)
+        await self._session.close()
+        self._sock.close()
+        self._sock = None
 
-            if resp.startswith(b&#34;PING&#34;):
-                await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
-                self.bot.dispatch(kasai.PingEvent(app=self.bot))
-                continue
+        if self._task and not self._task.cancelled():
+            self._task.cancel()
 
-            if b&#34;JOIN&#34; in resp:
-                join = kasai.JoinMessage.new(data)
-                self.bot.dispatch(kasai.JoinEvent(message=join, app=self.bot))
-                self._channels.append(join.channel_name)
-                _log.info(f&#34;joined {join.channel_name}&#34;)
-                continue
-
-            if b&#34;PART&#34; in resp:
-                part = kasai.PartMessage.new(data)
-                self.bot.dispatch(kasai.PartEvent(message=part, app=self.bot))
-                self._channels.remove(part.channel_name)
-                _log.info(f&#34;parted {part.channel_name}&#34;)
-                continue
-
-            if b&#34;CLEARCHAT&#34; in resp:
-                mod = kasai.ModActionMessage.new(data)
-                if mod.command.value == 0:
-                    self.bot.dispatch(kasai.ClearEvent(message=mod, app=self.bot))
-                elif mod.command.value == 1:
-                    self.bot.dispatch(kasai.BanEvent(message=mod, app=self.bot))
-                elif mod.command.value == 2:
-                    self.bot.dispatch(kasai.TimeoutEvent(message=mod, app=self.bot))
-                continue
-
-            if b&#34;PRIVMSG&#34; not in resp:
-                continue
-
-            pm = kasai.PrivMessage.new(data)
-            self.bot.dispatch(kasai.PrivMessageCreateEvent(message=pm, app=self.bot))
+        _log.info(&#34;successfully closed IRC websocket&#34;)
 
     async def join(self, *channels: str) -&gt; None:
-        &#34;&#34;&#34;Join a Twitch channel.
+        &#34;&#34;&#34;Joins the given Twitch channels&#39; chats.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        ```
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.join(*channels)
+        ```
 
         Parameters
         ----------
         *channels : str
-            The channels to join. This can be empty, in which case,
-            nothing will happen.
+            The login usernames of the channels to join.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to Twitch.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
 
         if not channels:
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;JOIN {c}&#34; for c in channels) + &#34;\r\n&#34;
+        msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
     async def part(self, *channels: str) -&gt; None:
-        &#34;&#34;&#34;Part (or leave) a Twitch channel.
+        &#34;&#34;&#34;Parts (leaves) the given Twitch channels&#39; chats.
+
+        .. note::
+            You do not need to part joined channels before shutting the
+            bot down — this is handled automatically.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        ```
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.part(*channels)
+        ```
 
         Parameters
         ----------
-        *channels : builtins.str
-            The channels to part. This can be empty, in which case,
-            nothing will happen.
+        *channels : str
+            The login usernames of the channels to part.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to Twitch.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+        if not channels:
+            return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;PART {c}&#34; for c in channels) + &#34;\r\n&#34;
+        msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
     async def create_message(self, channel: str, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to a given channel&#39;s chat. The client must
-        have joined that channel to send a message.
+        &#34;&#34;&#34;Send a message to a Twitch channel.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.create_message(
+            &#34;parafoxia&#34;,
+            &#34;Never gonna give you up!&#34;,
+        )
+        ```
 
         Parameters
         ----------
-        channel : builtins.str
-            The channel to send the message to. This must be prefixed
-            with a hash (#).
-        contents : builtins.str
-            The content of the message. The maximum allowed message
-            length varies on a number of factors, but generally,
-            messages should not be longer than about 400 characters.
+        channel : str
+            The login username of the channel you want to send a message
+            to.
+        content : str
+            The text content of the message you want to send.
 
-        Raises
-        ------
-        kasai.errors.NotConnected
-            The client is not connected to a Twitch channel.
-
-        kasai.errors.NotInChannel
-            The client has not joined the given channel.
+        Returns
+        -------
+        None
         &#34;&#34;&#34;
 
         if self._sock is None:
-            raise kasai.NotConnected(&#34;no active connections to send a message to&#34;)
+            raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+        channel = channel.strip(&#34;#&#34;)
 
         if channel not in self._channels:
-            raise kasai.NotInChannel(f&#34;the client is not connected to {channel}&#34;)
+            raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
         msg = (
             f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-            f&#34;PRIVMSG {channel} {content}\r\n&#34;
+            f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
         )
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+
+    async def fetch_user(self, user: str) -&gt; kasai.User:
+        &#34;&#34;&#34;Fetches a user from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
+        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+        &gt;&gt;&gt; user1 == user2
+        True
+        ```
+
+        Parameters
+        ----------
+        user : str
+            The login username or the ID of the user to fetch. Note that
+            while Twitch user IDs are numerical, they are strings.
+
+        Returns
+        -------
+        kasai.User
+            The fetched user.
+        &#34;&#34;&#34;
+
+        key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
+        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        return self.app.entity_factory.deserialize_twitch_user(payload[0])
+
+    async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
+        &#34;&#34;&#34;Fetches a channel from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+        &gt;&gt;&gt; print(channel.username)
+        parafoxia
+        ```
+
+        Parameters
+        ----------
+        channel : str
+            The ID of the channel to fetch. Note that while Twitch
+            channel IDs are numerical, they are strings. A channel&#39;s ID
+            is identical to the user ID of the channel.
+
+        Returns
+        -------
+        kasai.Channel
+            The fetched channel.
+        &#34;&#34;&#34;
+
+        payload = await self.app.twitch._request(
+            &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
+        )
+        return self.app.entity_factory.deserialize_twitch_channel(payload[0])
+
+    async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
+        key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
+        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
-<dt id="kasai.twitch.TwitchClient.bot"><code class="name">var <span class="ident">bot</span></code></dt>
+<dt id="kasai.twitch.TwitchClient.app"><code class="name">var <span class="ident">app</span> : <a title="kasai.bot.GatewayBot" href="bot.html#kasai.bot.GatewayBot">GatewayBot</a></code></dt>
 <dd>
-<div class="desc"><p>The Discord bot instance.</p></div>
-</dd>
-<dt id="kasai.twitch.TwitchClient.channels"><code class="name">var <span class="ident">channels</span> : list[str]</code></dt>
-<dd>
-<div class="desc"><p>A list of channels the client is connected to.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.list[builtins.str]</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>The base client application.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def channels(self) -&gt; list[str]:
-    &#34;&#34;&#34;A list of channels the client is connected to.
+def app(self) -&gt; kasai.GatewayBot:
+    &#34;&#34;&#34;The base client application.&#34;&#34;&#34;
 
-    Returns
-    -------
-    builtins.list[builtins.str]
-    &#34;&#34;&#34;
-
-    return self._channels</code></pre>
+    return self._app</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.is_alive"><code class="name">var <span class="ident">is_alive</span> : bool</code></dt>
 <dd>
-<div class="desc"><p>Whether the websocket is open. This does not necessarily mean
-it's connected to a channel.</p>
-<h2 id="returns">Returns</h2>
-<dl>
-<dt><code>builtins.bool</code></dt>
-<dd>&nbsp;</dd>
-</dl></div>
+<div class="desc"><p>Whether the client is connected to the Twitch Helix API. This
+does not necessarily mean the client is connected to the Twitch
+IRC servers.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
 def is_alive(self) -&gt; bool:
-    &#34;&#34;&#34;Whether the websocket is open. This does not necessarily mean
-    it&#39;s connected to a channel.
+    &#34;&#34;&#34;Whether the client is connected to the Twitch Helix API. This
+    does not necessarily mean the client is connected to the Twitch
+    IRC servers.&#34;&#34;&#34;
 
-    Returns
-    -------
-    builtins.bool
-    &#34;&#34;&#34;
+    return self._session is not None and not self._session.closed</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.is_authorised"><code class="name">var <span class="ident">is_authorised</span> : bool</code></dt>
+<dd>
+<div class="desc"><p>Whether the client is authorised to connect to the Twitch
+Helix API.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def is_authorised(self) -&gt; bool:
+    &#34;&#34;&#34;Whether the client is authorised to connect to the Twitch
+    Helix API.&#34;&#34;&#34;
 
-    return self._sock is not None</code></pre>
+    return self._api_token is not None</code></pre>
 </details>
 </dd>
 </dl>
 <h3>Methods</h3>
 <dl>
+<dt id="kasai.twitch.TwitchClient.close"><code class="name flex">
+<span>async def <span class="ident">close</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Ends all Twitch services. This is called automatically when
+the Discord bot shuts down.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def close(self) -&gt; None:
+    &#34;&#34;&#34;Ends all Twitch services. This is called automatically when
+    the Discord bot shuts down.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
+
+    if not self.is_alive:
+        raise kasai.NotAlive(
+            &#34;Twitch services were never started, or have already been shut down&#34;
+        )
+
+    assert self._session
+    assert self._sock
+
+    await self.part(*self._channels)
+    await self._session.close()
+    self._sock.close()
+    self._sock = None
+
+    if self._task and not self._task.cancelled():
+        self._task.cancel()
+
+    _log.info(&#34;successfully closed IRC websocket&#34;)</code></pre>
+</details>
+</dd>
 <dt id="kasai.twitch.TwitchClient.create_message"><code class="name flex">
 <span>async def <span class="ident">create_message</span></span>(<span>self, channel: str, content: str) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send a message to a given channel's chat. The client must
-have joined that channel to send a message.</p>
+<div class="desc"><p>Send a message to a Twitch channel.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.create_message(
+    &quot;parafoxia&quot;,
+    &quot;Never gonna give you up!&quot;,
+)
+</code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>channel</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The channel to send the message to. This must be prefixed
-with a hash (#).</dd>
-<dt><strong><code>contents</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The content of the message. The maximum allowed message
-length varies on a number of factors, but generally,
-messages should not be longer than about 400 characters.</dd>
+<dt><strong><code>channel</code></strong> :&ensp;<code>str</code></dt>
+<dd>The login username of the channel you want to send a message
+to.</dd>
+<dt><strong><code>content</code></strong> :&ensp;<code>str</code></dt>
+<dd>The text content of the message you want to send.</dd>
 </dl>
-<h2 id="raises">Raises</h2>
+<h2 id="returns">Returns</h2>
 <dl>
-<dt><code><a title="kasai.errors.NotConnected" href="errors.html#kasai.errors.NotConnected">NotConnected</a></code></dt>
-<dd>The client is not connected to a Twitch channel.</dd>
-<dt><code><a title="kasai.errors.NotInChannel" href="errors.html#kasai.errors.NotInChannel">NotInChannel</a></code></dt>
-<dd>The client has not joined the given channel.</dd>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def create_message(self, channel: str, content: str) -&gt; None:
-    &#34;&#34;&#34;Send a message to a given channel&#39;s chat. The client must
-    have joined that channel to send a message.
+    &#34;&#34;&#34;Send a message to a Twitch channel.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await bot.twitch.create_message(
+        &#34;parafoxia&#34;,
+        &#34;Never gonna give you up!&#34;,
+    )
+    ```
 
     Parameters
     ----------
-    channel : builtins.str
-        The channel to send the message to. This must be prefixed
-        with a hash (#).
-    contents : builtins.str
-        The content of the message. The maximum allowed message
-        length varies on a number of factors, but generally,
-        messages should not be longer than about 400 characters.
+    channel : str
+        The login username of the channel you want to send a message
+        to.
+    content : str
+        The text content of the message you want to send.
 
-    Raises
-    ------
-    kasai.errors.NotConnected
-        The client is not connected to a Twitch channel.
-
-    kasai.errors.NotInChannel
-        The client has not joined the given channel.
+    Returns
+    -------
+    None
     &#34;&#34;&#34;
 
     if self._sock is None:
-        raise kasai.NotConnected(&#34;no active connections to send a message to&#34;)
+        raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+    channel = channel.strip(&#34;#&#34;)
 
     if channel not in self._channels:
-        raise kasai.NotInChannel(f&#34;the client is not connected to {channel}&#34;)
+        raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
     msg = (
         f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-        f&#34;PRIVMSG {channel} {content}\r\n&#34;
+        f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
     )
     loop = asyncio.get_running_loop()
     await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.fetch_channel"><code class="name flex">
+<span>async def <span class="ident">fetch_channel</span></span>(<span>self, channel: str) ‑> <a title="kasai.channels.Channel" href="channels.html#kasai.channels.Channel">Channel</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Fetches a channel from the Twitch Helix API.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&quot;606074029&quot;)
+&gt;&gt;&gt; print(channel.username)
+parafoxia
+</code></pre>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>channel</code></strong> :&ensp;<code>str</code></dt>
+<dd>The ID of the channel to fetch. Note that while Twitch
+channel IDs are numerical, they are strings. A channel's ID
+is identical to the user ID of the channel.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>kasai.Channel</code></dt>
+<dd>The fetched channel.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
+    &#34;&#34;&#34;Fetches a channel from the Twitch Helix API.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+    &gt;&gt;&gt; print(channel.username)
+    parafoxia
+    ```
+
+    Parameters
+    ----------
+    channel : str
+        The ID of the channel to fetch. Note that while Twitch
+        channel IDs are numerical, they are strings. A channel&#39;s ID
+        is identical to the user ID of the channel.
+
+    Returns
+    -------
+    kasai.Channel
+        The fetched channel.
+    &#34;&#34;&#34;
+
+    payload = await self.app.twitch._request(
+        &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
+    )
+    return self.app.entity_factory.deserialize_twitch_channel(payload[0])</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.fetch_user"><code class="name flex">
+<span>async def <span class="ident">fetch_user</span></span>(<span>self, user: str) ‑> <a title="kasai.users.User" href="users.html#kasai.users.User">User</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Fetches a user from the Twitch Helix API.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&quot;parafoxia&quot;)
+&gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&quot;606074029&quot;)
+&gt;&gt;&gt; user1 == user2
+True
+</code></pre>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>user</code></strong> :&ensp;<code>str</code></dt>
+<dd>The login username or the ID of the user to fetch. Note that
+while Twitch user IDs are numerical, they are strings.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>kasai.User</code></dt>
+<dd>The fetched user.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def fetch_user(self, user: str) -&gt; kasai.User:
+    &#34;&#34;&#34;Fetches a user from the Twitch Helix API.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
+    &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+    &gt;&gt;&gt; user1 == user2
+    True
+    ```
+
+    Parameters
+    ----------
+    user : str
+        The login username or the ID of the user to fetch. Note that
+        while Twitch user IDs are numerical, they are strings.
+
+    Returns
+    -------
+    kasai.User
+        The fetched user.
+    &#34;&#34;&#34;
+
+    key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
+    payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+    return self.app.entity_factory.deserialize_twitch_user(payload[0])</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.join"><code class="name flex">
 <span>async def <span class="ident">join</span></span>(<span>self, *channels: str) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Join a Twitch channel.</p>
+<div class="desc"><p>Joins the given Twitch channels' chats.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.join(&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+</code></pre>
+<h2 id="example_1">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+&gt;&gt;&gt; await bot.twitch.join(*channels)
+</code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>*channels</code></strong> :&ensp;<code>str</code></dt>
-<dd>The channels to join. This can be empty, in which case,
-nothing will happen.</dd>
+<dd>The login usernames of the channels to join.</dd>
 </dl>
-<h2 id="raises">Raises</h2>
+<h2 id="returns">Returns</h2>
 <dl>
-<dt><code><a title="kasai.errors.NotConnected" href="errors.html#kasai.errors.NotConnected">NotConnected</a></code></dt>
-<dd>The client is not connected to Twitch.</dd>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def join(self, *channels: str) -&gt; None:
-    &#34;&#34;&#34;Join a Twitch channel.
+    &#34;&#34;&#34;Joins the given Twitch channels&#39; chats.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    ```
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; await bot.twitch.join(*channels)
+    ```
 
     Parameters
     ----------
     *channels : str
-        The channels to join. This can be empty, in which case,
-        nothing will happen.
+        The login usernames of the channels to join.
 
-    Raises
-    ------
-    kasai.errors.NotConnected
-        The client is not connected to Twitch.
+    Returns
+    -------
+    None
     &#34;&#34;&#34;
 
     if self._sock is None:
-        raise kasai.NotConnected(&#34;no active connections&#34;)
+        raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
 
     if not channels:
         return
 
     loop = asyncio.get_running_loop()
-    msg = &#34;\r\n&#34;.join(f&#34;JOIN {c}&#34; for c in channels) + &#34;\r\n&#34;
+    msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
     await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
 </details>
 </dd>
@@ -627,43 +1303,135 @@ nothing will happen.</dd>
 <span>async def <span class="ident">part</span></span>(<span>self, *channels: str) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Part (or leave) a Twitch channel.</p>
+<div class="desc"><p>Parts (leaves) the given Twitch channels' chats.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You do not need to part joined channels before shutting the
+bot down — this is handled automatically.</p>
+</div>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.part(&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+</code></pre>
+<h2 id="example_1">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+&gt;&gt;&gt; await bot.twitch.part(*channels)
+</code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>*channels</code></strong> :&ensp;<code>builtins.str</code></dt>
-<dd>The channels to part. This can be empty, in which case,
-nothing will happen.</dd>
+<dt><strong><code>*channels</code></strong> :&ensp;<code>str</code></dt>
+<dd>The login usernames of the channels to part.</dd>
 </dl>
-<h2 id="raises">Raises</h2>
+<h2 id="returns">Returns</h2>
 <dl>
-<dt><code><a title="kasai.errors.NotConnected" href="errors.html#kasai.errors.NotConnected">NotConnected</a></code></dt>
-<dd>The client is not connected to Twitch.</dd>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def part(self, *channels: str) -&gt; None:
-    &#34;&#34;&#34;Part (or leave) a Twitch channel.
+    &#34;&#34;&#34;Parts (leaves) the given Twitch channels&#39; chats.
+
+    .. note::
+        You do not need to part joined channels before shutting the
+        bot down — this is handled automatically.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    ```
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; await bot.twitch.part(*channels)
+    ```
 
     Parameters
     ----------
-    *channels : builtins.str
-        The channels to part. This can be empty, in which case,
-        nothing will happen.
+    *channels : str
+        The login usernames of the channels to part.
 
-    Raises
-    ------
-    kasai.errors.NotConnected
-        The client is not connected to Twitch.
+    Returns
+    -------
+    None
     &#34;&#34;&#34;
 
     if self._sock is None:
-        raise kasai.NotConnected(&#34;no active connections&#34;)
+        raise kasai.NotAlive(&#34;there are no alive IRC websockets&#34;)
+
+    if not channels:
+        return
 
     loop = asyncio.get_running_loop()
-    msg = &#34;\r\n&#34;.join(f&#34;PART {c}&#34; for c in channels) + &#34;\r\n&#34;
+    msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
     await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.start"><code class="name flex">
+<span>async def <span class="ident">start</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Start all Twitch services. This is called automatically when
+the Discord bot starts.</p>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>None</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def start(self) -&gt; None:
+    &#34;&#34;&#34;Start all Twitch services. This is called automatically when
+    the Discord bot starts.
+
+    Returns
+    -------
+    None
+    &#34;&#34;&#34;
+
+    if self.is_alive:
+        raise kasai.IsAlive(&#34;a client session is already alive&#34;)
+
+    # Enable API requests.
+    self._session = aiohttp.ClientSession()
+
+    async with self._session.post(
+        kasai.TWITCH_TOKEN_URI,
+        headers={&#34;Content-Type&#34;: &#34;application/x-www-form-urlencoded&#34;},
+        data={
+            &#34;client_id&#34;: self._client_id,
+            &#34;client_secret&#34;: self._client_secret,
+            &#34;grant_type&#34;: &#34;client_credentials&#34;,
+        },
+    ) as resp:
+        data = await resp.json()
+        self._api_token = data[&#34;access_token&#34;]
+
+    # Open an IRC websocket.
+    self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self._sock.setblocking(False)
+
+    loop = asyncio.get_running_loop()
+    await loop.sock_connect(self._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
+    await loop.sock_sendall(
+        self._sock,
+        (
+            f&#34;PASS {self._irc_token}\r\nNICK {self._nickname}\r\n&#34;
+            &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
+        ).encode(),
+    )
+
+    self._task = loop.create_task(self._listen())
+    self._task.add_done_callback(lambda task: task.result())
+
+    # Finish up.
+    _log.info(&#34;successfully started Twitch services&#34;)</code></pre>
 </details>
 </dd>
 </dl>
@@ -733,12 +1501,16 @@ setTimeout(() => input.focus(), 100);
 <li>
 <h4><code><a title="kasai.twitch.TwitchClient" href="#kasai.twitch.TwitchClient">TwitchClient</a></code></h4>
 <ul class="two-column">
-<li><code><a title="kasai.twitch.TwitchClient.bot" href="#kasai.twitch.TwitchClient.bot">bot</a></code></li>
-<li><code><a title="kasai.twitch.TwitchClient.channels" href="#kasai.twitch.TwitchClient.channels">channels</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.app" href="#kasai.twitch.TwitchClient.app">app</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.close" href="#kasai.twitch.TwitchClient.close">close</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.create_message" href="#kasai.twitch.TwitchClient.create_message">create_message</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.fetch_channel" href="#kasai.twitch.TwitchClient.fetch_channel">fetch_channel</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.fetch_user" href="#kasai.twitch.TwitchClient.fetch_user">fetch_user</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.is_alive" href="#kasai.twitch.TwitchClient.is_alive">is_alive</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.is_authorised" href="#kasai.twitch.TwitchClient.is_authorised">is_authorised</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.join" href="#kasai.twitch.TwitchClient.join">join</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.part" href="#kasai.twitch.TwitchClient.part">part</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.start" href="#kasai.twitch.TwitchClient.start">start</a></code></li>
 </ul>
 </li>
 </ul>

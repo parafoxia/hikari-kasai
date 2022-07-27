@@ -71,13 +71,13 @@ bot = kasai.GatewayBot(
 @bot.listen(hikari.StartedEvent)
 async def on_started(event: hikari.StartedEvent):
     # Connect to your Twitch chat.
-    await bot.twitch.join("#twitchdev")
+    await bot.twitch.join("twitchdev")
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def on_message(event: hikari.GuildMessageCreateEvent):
     # Send a message from Discord to Twitch chat.
     if event.content.startswith("!send"):
-        await bot.twitch.create_message("#twitchdev", event.content[6:])
+        await bot.twitch.create_message("twitchdev", event.content[6:])
 
 @bot.listen(kasai.MessageCreateEvent)
 async def on_twitch_message(event: kasai.MessageCreateEvent):

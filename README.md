@@ -9,9 +9,11 @@
 
 Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.
 
+This serves to extend [Hikari](https://pypi.org/project/hikari/), and cannot be used without it.
+
 ## Installation
 
-To install the latest released version of *Kasai*, use the following command:
+To install the latest released version of Kasai, use the following command:
 ```sh
 pip install hikari-kasai
 ```
@@ -25,7 +27,7 @@ You may need to prefix these commands with a call to the Python interpreter depe
 
 ## Creating your bot
 
-*Kasai* provides a subclass for `hikari.GatewayBot` that contains methods and attributes for Twitch chat interfacing.
+Kasai provides a subclass for `hikari.GatewayBot` that contains methods and attributes for Twitch chat interfacing.
 
 ```py
 import kasai
@@ -33,7 +35,7 @@ import kasai
 bot = kasai.GatewayBot(...)
 ```
 
-To use *Kasai* with command handlers, you will need to create a custom subclass that inherits from both `kasai.GatewayBot` and your command handler's bot class.
+To use Kasai with command handlers, you will need to create a custom subclass that inherits from both `kasai.GatewayBot` and your command handler's bot class.
 For example, if you want to use *Lightbulb*:
 
 ```py
@@ -88,6 +90,9 @@ async def on_twitch_message(event: kasai.MessageCreateEvent):
 # Run the bot.
 bot.run()
 ```
+
+There are [more examples](https://github.com/parafoxia/hikari-kasai/tree/main/examples) should you wish to see them.
+It may also be worth looking into how to [speed Hikari up](https://github.com/hikari-py/hikari#making-your-application-more-efficient) to get the best performance out of Kasai.
 
 ## Contributing
 

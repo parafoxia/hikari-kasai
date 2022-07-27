@@ -39,7 +39,9 @@ from hashlib import sha256
 from time import time
 
 import aiohttp
+from hikari.internal import time as time_
 from hikari.internal.data_binding import JSONObject
+from hikari.internal.ux import TRACE
 
 import kasai
 
@@ -121,39 +123,101 @@ class TwitchClient:
         method: str,
         route: str,
         *,
+        auth: bool = False,
         options: dict[str, list[str]],
     ) -> list[JSONObject]:
+        def stringify(headers: dict[str, str], body: dict[str, str]) -> str:
+            string = "\n".join(
+                f"    {k}: {v}"
+                if k != "Authorization"
+                else f"    {k}: **REDACTED TOKEN**"
+                for k, v in headers.items()
+            )
+
+            if body:
+                copy = body.copy()
+                if "client_secret" in copy.keys():
+                    copy["client_secret"] = "**REDACTED SECRET**"  # nosec: B105
+                if "access_token" in copy.keys():
+                    copy["access_token"] = "**REDACTED TOKEN**"  # nosec: B105
+                string += f"\n\n    {copy}"
+
+            return string
+
         if self._session is None:
             raise kasai.NotAlive("there is no active API session")
 
-        query = "?"
-        for key, value in options.items():
-            query += "&".join(f"{key}={v}" for v in value)
+        if auth:
+            url = kasai.TWITCH_TOKEN_URI
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            data = {
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "grant_type": "client_credentials",
+            }
+        else:
+            query = "?"
+            for key, value in options.items():
+                query += "&".join(f"{key}={v}" for v in value)
 
-        async with self._session.request(
-            method,
-            kasai.TWITCH_HELIX_URI + route + query,
-            headers={
+            url = kasai.TWITCH_HELIX_URI + route + query
+            headers = {
                 "Authorization": f"Bearer {self._api_token}",
                 "Client-Id": self._client_id,
-            },
+            }
+            data = {}
+
+        uuid = time_.uuid()
+        trace_enabled = _log.isEnabledFor(TRACE)
+
+        if trace_enabled:
+            _log.log(
+                TRACE,
+                "%s %s %s\n%s",
+                uuid,
+                method,
+                url,
+                stringify(headers, data),
+            )
+            start = time_.monotonic()
+
+        async with self._session.request(
+            method, url, headers=headers, data=data
         ) as resp:
-            data = await resp.json()
+            res = await resp.json()
 
             if not resp.ok:
-                raise kasai.RequestFailed(data["status"], data["message"])
+                raise kasai.RequestFailed(res["status"], res["message"])
 
-        return t.cast(list[JSONObject], data["data"])
+        if trace_enabled:
+            time_taken = (time_.monotonic() - start) * 1_000
+            _log.log(
+                TRACE,
+                "%s %s %s in %sms\n%s",
+                uuid,
+                resp.status,
+                resp.reason,
+                time_taken,
+                stringify(dict(resp.headers), res),
+            )
+
+        if "data" not in res.keys():
+            return [res]
+        return t.cast(list[JSONObject], res["data"])
 
     async def _listen(self) -> None:
         assert self._sock
         loop = asyncio.get_running_loop()
+        _log.debug("starting IRC listener...")
 
         while True:
-            payload = (await loop.sock_recv(self._sock, 512)).decode("utf-8").strip()
-            _log.debug(f"received IRC message: {payload}")
+            payload = await loop.sock_recv(self._sock, 512)
+            load = payload.decode("utf-8").strip()
+            _log.log(
+                TRACE, f"received IRC payload with size {len(payload)}\n    {load}"
+            )
 
-            for data in payload.split("\n"):
+            for data in load.split("\n"):
                 if data.startswith("@"):
                     raw_tags, message = data.split(" ", maxsplit=1)
                     tags = self._transform_tags(raw_tags)
@@ -163,6 +227,7 @@ class TwitchClient:
 
                 if message.startswith("PING"):
                     await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
+                    _log.log(TRACE, "received PING, returned PONG")
                     self.app.dispatch(kasai.PingEvent(app=self.app))
                     continue
 
@@ -230,23 +295,17 @@ class TwitchClient:
         None
         """
 
+        _log.info("starting Twitch services...")
+
         if self.is_alive:
             raise kasai.IsAlive("a client session is already alive")
 
         # Enable API requests.
         self._session = aiohttp.ClientSession()
 
-        async with self._session.post(
-            kasai.TWITCH_TOKEN_URI,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            data={
-                "client_id": self._client_id,
-                "client_secret": self._client_secret,
-                "grant_type": "client_credentials",
-            },
-        ) as resp:
-            data = await resp.json()
-            self._api_token = data["access_token"]
+        res = await self._request("POST", "", auth=True, options={})
+        self._api_token = res[0]["access_token"]
+        _log.info("Helix API is ready to use")
 
         # Open an IRC websocket.
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -254,6 +313,7 @@ class TwitchClient:
 
         loop = asyncio.get_running_loop()
         await loop.sock_connect(self._sock, ("irc.chat.twitch.tv", 6667))
+        _log.debug(f"connected to {self._sock.getpeername()}")
         await loop.sock_sendall(
             self._sock,
             (
@@ -262,11 +322,18 @@ class TwitchClient:
             ).encode(),
         )
 
+        def end_task(task: asyncio.Task[None]) -> None:
+            try:
+                task.result()
+            except asyncio.CancelledError:
+                ...
+
         self._task = loop.create_task(self._listen())
-        self._task.add_done_callback(lambda task: task.result())
+        self._task.add_done_callback(end_task)
+        _log.info("IRC listener ready to receive messages")
 
         # Finish up.
-        _log.info("successfully started Twitch services")
+        _log.info("successfully started all Twitch services!")
 
     async def close(self) -> None:
         """Ends all Twitch services. This is called automatically when

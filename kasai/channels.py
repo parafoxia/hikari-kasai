@@ -28,20 +28,64 @@
 
 from __future__ import annotations
 
-__all__ = ("Channel",)
+__all__ = ("Game", "Channel")
 
 import attr
+from hikari.internal import attr_extensions
+
+from kasai import traits
 
 
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class Game:
+    """A class representing a Twitch game."""
+
+    id: str = attr.field(hash=True, repr=True)
+    """This game's ID."""
+
+    name: str = attr.field(eq=False, hash=False, repr=True)
+    """This game's name."""
+
+
+@attr_extensions.with_copy
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
 class Channel:
-    """A dataclass representing a Twitch channel. All attributes must
-    be passed to the constructor on creation, though you should never
-    need to create this yourself.
-    """
+    """A class representing a Twitch channel."""
 
-    id: str
-    """The channel's ID."""
+    app: traits.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    """The base client application."""
 
-    name: str
-    """The name of the channel."""
+    id: str = attr.field(hash=True, repr=True)
+    """This channel's ID."""
+
+    username: str = attr.field(eq=False, hash=False, repr=False)
+    """This channel's login username."""
+
+    display_name: str = attr.field(eq=False, hash=False, repr=True)
+    """The name this channel is displayed as on Twitch. This will always
+    be the username with casing variations."""
+
+    language: str = attr.field(eq=False, hash=False, repr=False)
+    """The language this channel is streaming using (according to their
+    settings)."""
+
+    game: Game = attr.field(eq=False, hash=False, repr=True)
+    """The game this channel is playing."""
+
+    title: str = attr.field(eq=False, hash=False, repr=True)
+    """The title of this channel's stream."""
+
+    delay: int = attr.field(eq=False, hash=False, repr=False)
+    """The number of seconds this channel's stream is delayed by."""
+
+    @property
+    def irc_format(self) -> str:
+        """This channel's username in the format IRC expects it."""
+
+        return f"#{self.username}"

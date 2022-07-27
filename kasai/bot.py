@@ -30,7 +30,6 @@ from __future__ import annotations
 
 __all__ = ("GatewayBot",)
 
-import asyncio
 import logging
 import typing as t
 from importlib.util import find_spec
@@ -38,34 +37,39 @@ from importlib.util import find_spec
 import hikari
 
 import kasai
+from kasai import entity_factory, traits
 
 _log = logging.getLogger(__name__)
 
 
-class GatewayBot(hikari.GatewayBot):
-    """A subclass of `hikari.impl.bot.GatewayBot` which includes Twitch
-    functionality.
+class GatewayBot(hikari.GatewayBot, traits.TwitchAware):
+    """A class representing a Discord bot. This extends
+    `hikari.GatewayBot`.
 
-    If you wish to use a command handler, you can create a subclass
-    which inherits from this class and your preferred command handler's
-    bot class. Note that if you do this, Kasai's GatewayBot *must* be
-    inherited first.
+    To extend command handler classes, you should create a subclass that
+    inherits from this class and your preferred command handler's bot
+    class (making sure you inherit from this class first).
 
-    For example:
+    Example:
 
     ```py
-    class Bot(kasai.GatewayBot, lightbulb.BotApp):
+    class MyBot(kasai.GatewayBot, lightbulb.BotApp):
         ...
 
-    bot = Bot(...)
+    bot = MyBot(...)
     ```
 
     Parameters
     ----------
-    token : builtins.str
+    token : str
         Your Discord bot's token.
-    irc_token : builtins.str
-        Your Twitch IRC access token.
+    irc_token : str
+        Your Twitch IRC access token. This is different to an API access
+        token.
+    client_id : str
+        Your Twitch application's client ID.
+    client_secret : str
+        Your Twitch application's client secret.
 
     Other Parameters
     ----------------
@@ -73,28 +77,39 @@ class GatewayBot(hikari.GatewayBot):
         The banner to be displayed on boot (this is passed directly to
         the superclass initialiser). This defaults to "kasai".
     **kwargs : Any
-        Additional keyword arguments to be passed to the superclass.
-
-    .. versionchanged:: 0.6a
-        * This no longer takes `channel` and `nickname` arguments.
-        * You can now choose the banner that will be displayed on
-        boot.
+        Additional keyword arguments to be passed to the superclasses.
     """
 
     def __init__(
         self,
         token: str,
         irc_token: str,
+        client_id: str,
+        client_secret: str,
         *,
         banner: str = "kasai",
         **kwargs: t.Any,
     ) -> None:
         super().__init__(token, banner=banner, **kwargs)
-        self._twitch = kasai.TwitchClient(self, irc_token)
+        self._entity_factory: entity_factory.TwitchEntityFactoryImpl
+
+        self._entity_factory = entity_factory.TwitchEntityFactoryImpl(self)
+        self._twitch = kasai.TwitchClient(self, irc_token, client_id, client_secret)
+
+    @property
+    def entity_factory(self) -> entity_factory.TwitchEntityFactory:
+        """This client's entity factory.
+
+        Returns
+        -------
+        kasai.entity_factory.TwitchEntityFactory
+        """
+
+        return self._entity_factory
 
     @property
     def twitch(self) -> kasai.TwitchClient:
-        """The Twitch IRC client interface.
+        """The Twitch client.
 
         Returns
         -------
@@ -103,75 +118,26 @@ class GatewayBot(hikari.GatewayBot):
 
         return self._twitch
 
-    async def start_irc(self, *channels: str) -> None:
-        """Create a websocket connection to Twitch's IRC servers and
-        start listening for messages.
+    async def start(self, **kwargs: t.Any) -> None:
+        """Starts the Twitch and Discord clients (in that order). This
+        often does not need to be called, as `kasai.GatewayBot.run` will
+        call this automatically.
 
-        Parameters
-        ----------
-        *channels : builtins.str
-            The channels to join once connected. This can be empty, in
-            which case you will need to manually join your channel(s)
-            later. All channels must be prefixed with a hash (#).
-
-        Raises
-        ------
-        kasai.errors.AlreadyConnected
-            Kasai is already connected to a Twitch channel.
+        Other Parameters
+        ----------------
+        **kwargs : Any
+            Additional arguments to be passed to
+            `hikari.GatewayBot.start`.
         """
 
-        if self._twitch._sock is not None:
-            raise kasai.AlreadyConnected("there is already an active connection")
-
-        loop = asyncio.get_running_loop()
-        self._twitch._create_sock()
-        assert self._twitch._sock is not None
-
-        await loop.sock_connect(self._twitch._sock, ("irc.chat.twitch.tv", 6667))
-        _log.info("connected to Twitch")
-
-        await loop.sock_sendall(
-            self._twitch._sock,
-            (
-                f"PASS {self._twitch._token}\r\n"
-                f"NICK {self._twitch._nickname}\r\n"
-                "CAP REQ :twitch.tv/commands twitch.tv/tags\r\n"
-            ).encode(),
-        )
-
-        self._twitch._task = loop.create_task(self._twitch._irclisten(loop))
-        _log.info("successfully started IRC websocket")
-
-        if channels:
-            await self._twitch.join(*channels)
-
-    async def close_irc(self) -> None:
-        """Stop listening for messages and close the connection to your
-        Twitch channel(s).
-
-        Raises
-        ------
-        kasai.errors.NotConnected
-            Kasai is not currently connected to a Twitch channel.
-        """
-
-        if self._twitch._sock is None:
-            raise kasai.NotConnected("no active connections to close")
-
-        if not self._twitch._task:
-            return
-
-        await self._twitch.part(*self._twitch._channels)
-        self._twitch._sock.close()
-        self._twitch._sock = None
-        if not self._twitch._task.cancelled():
-            self._twitch._task.cancel()
-        _log.info("successfully closed IRC websocket")
+        await self._twitch.start()
+        await super().start(**kwargs)
 
     async def _close(self) -> None:
         if self._twitch.is_alive:
-            await self.close_irc()
-        return await super()._close()
+            await self._twitch.close()
+
+        await super()._close()
 
     @staticmethod
     def print_banner(

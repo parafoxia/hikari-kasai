@@ -26,34 +26,27 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__all__ = ("KasaiError", "NotAlive", "IsAlive", "HelixError", "RequestFailed")
+from __future__ import annotations
+
+__all__ = ("TwitchAware",)
+
+import typing as t
+
+from hikari import traits
+
+import kasai
 
 
-class KasaiError(Exception):
-    """The base exception class for all Kasai errors."""
+@t.runtime_checkable
+class TwitchAware(traits.RESTAware, t.Protocol):
+    """A structural supertype for a Twitch-aware object.
 
+    These are able to perform Twitch API calls and IRC operations.
+    """
 
-class NotAlive(KasaiError):
-    """Exception thrown when the Twitch client is not alive when it
-    should be."""
+    __slots__: t.Sequence[str] = ()
 
-
-class IsAlive(KasaiError):
-    """Exception thrown when the Twitch client is alive when it
-    shouldn't be."""
-
-
-class HelixError(KasaiError):
-    """Exception thrown when something goes wrong regarding the Twitch
-    Helix API."""
-
-
-class RequestFailed(HelixError):
-    """Exception thrown when a Twitch Helix API request fails."""
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(f"{code}: {message}")
-
-
-class IrcError(KasaiError):
-    """Exception thrown when something goes wrong regarding IRC."""
+    @property
+    def twitch(self) -> kasai.TwitchClient:
+        """The Twitch client to use for Twitch operations."""
+        raise NotImplementedError

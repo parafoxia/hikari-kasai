@@ -40,6 +40,9 @@ __bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
 __ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
 __changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
 
+TWITCH_HELIX_URI = "https://api.twitch.tv/helix/"
+TWITCH_TOKEN_URI = "https://id.twitch.tv/oauth2/token"  # nosec: B105
+
 from pathlib import Path
 
 readme = Path(__file__).parent.parent / "README.md"
@@ -56,5 +59,6 @@ from kasai.channels import *
 from kasai.errors import *
 from kasai.events import *
 from kasai.messages import *
+from kasai.traits import *
 from kasai.twitch import *
 from kasai.users import *

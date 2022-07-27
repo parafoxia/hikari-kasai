@@ -28,11 +28,16 @@
 
 from __future__ import annotations
 
-__all__ = ("User",)
+__all__ = ("User", "Viewer")
 
+import abc
+import datetime as dt
 import enum
 
 import attr
+from hikari.internal import attr_extensions
+
+from kasai import traits
 
 
 class UserType(enum.Enum):
@@ -48,64 +53,161 @@ class UserType(enum.Enum):
     """"""
 
 
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class User:
-    """A dataclass representing a Twitch user. All attributes must be
-    passed to the constructor on creation, though you should never need
-    to create this yourself.
+class User(abc.ABC):
+    """A class representing a Twitch user."""
 
-    .. note::
-        This does not necessarily represent a global user. The values
-        of some attributes are dependent on context, often the channel
-        the user was in when they sent a message.
-    """
-
-    id: str
-    """The user's ID."""
-
-    color: int
-    """The user's colour in the current context. This is an integer
-    representation of the colour's hex code."""
-
-    display_name: str
-    """The user's display name."""
-
-    is_mod: bool
-    """Whether the user is a mod in the current context."""
-
-    is_subscriber: bool
-    """Whether the user is a subscriber in the current context."""
-
-    is_turbo: bool
-    """Whether the user has ads turned off globally."""
-
-    is_broadcaster: bool
-    """Whether the user is the broadcaster."""
-
-    type: UserType
-    """The user type. This will be :obj:`UserType.NORMAL` unless the
-    user works for Twitch."""
+    __slots__ = ()
 
     @property
+    @abc.abstractmethod
+    def app(self) -> traits.TwitchAware:
+        """Client application that models may use for procedures."""
+
+    @property
+    @abc.abstractmethod
+    def broadcaster_type(self) -> str:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def description(self) -> str:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def display_name(self) -> str:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def id(self) -> str:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
     def username(self) -> str:
-        """The user's username. This is always their display name in
-        all lower case.
+        """A property."""
 
-        Returns
-        -------
-        builtins.str
-        """
+    @property
+    @abc.abstractmethod
+    def offline_image_url(self) -> str:
+        """A property."""
 
-        return self.display_name.lower()
+    @property
+    @abc.abstractmethod
+    def profile_image_url(self) -> str:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def type(self) -> UserType:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def created_at(self) -> dt.datetime:
+        """A property."""
+
+
+class Viewer(User, abc.ABC):
+    """A class representing a Twitch viewer.
+
+    This is largely the same as a normal `User`, but contains additional
+    information related to the user's relationship with the channel
+    they're currently viewing.
+    """
+
+    @property
+    @abc.abstractmethod
+    def color(self) -> int:
+        """A property."""
 
     @property
     def colour(self) -> int:
-        """An alias for those who can spell correctly. This is an
-        integer representation of the colour's hex code.
-
-        Returns
-        -------
-        builtins.int
-        """
-
+        """A property."""
         return self.color
+
+    @property
+    @abc.abstractmethod
+    def is_mod(self) -> bool:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def is_subscriber(self) -> bool:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def is_turbo(self) -> bool:
+        """A property."""
+
+    @property
+    @abc.abstractmethod
+    def is_broadcaster(self) -> bool:
+        """A property."""
+
+
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class UserImpl(User):
+    """Concrete implementation of user information."""
+
+    app: traits.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    """The client application that models may use for procedures."""
+
+    broadcaster_type: str = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    description: str = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    display_name: str = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""
+
+    id: str = attr.field(hash=True, repr=True)
+    """The ID of this user."""
+
+    username: str = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    offline_image_url: str = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    profile_image_url: str = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    type: UserType = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""
+
+    def __str__(self) -> str:
+        return self.username
+
+
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class ViewerImpl(UserImpl, Viewer):
+    """Concrete implementation of viewer information."""
+
+    color: int = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""
+
+    is_mod: bool = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""
+
+    is_subscriber: bool = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""
+
+    is_turbo: bool = attr.field(eq=False, hash=False, repr=False)
+    """An attribute."""
+
+    is_broadcaster: bool = attr.field(eq=False, hash=False, repr=True)
+    """An attribute."""

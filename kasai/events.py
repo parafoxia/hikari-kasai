@@ -30,16 +30,19 @@ from __future__ import annotations
 
 __all__ = (
     "KasaiEvent",
-    "PrivMessageCreateEvent",
+    "MessageCreateEvent",
     "PingEvent",
     "JoinEvent",
     "PartEvent",
+    "JoinRoomstateEvent",
+    "ModActionEvent",
     "ClearEvent",
     "BanEvent",
     "TimeoutEvent",
 )
 
-import typing as t
+import abc
+import datetime as dt
 
 import attr
 from hikari import Event
@@ -47,192 +50,217 @@ from hikari.internal import attr_extensions
 
 import kasai
 
-if t.TYPE_CHECKING:
-    from hikari import traits
 
-    from kasai.messages import JoinMessage, ModActionMessage, PartMessage, PrivMessage
+class KasaiEvent(Event, abc.ABC):
+    """The basis for all Kasai events."""
+
+    @property
+    @abc.abstractmethod
+    def app(self) -> kasai.TwitchAware:
+        """The bot client instance."""
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class KasaiEvent(Event):
-    """A dataclass representing a Kasai event. All instance attributes
-    must be passed to the constructor on creation.
-    """
-
-    app: traits.RESTAware = attr.field(metadata={attr_extensions.SKIP_DEEP_COPY: True})
-    """The bot client instance."""
-
-
-@attr_extensions.with_copy
-@attr.define(kw_only=True, weakref_slot=False)
-class PrivMessageCreateEvent(KasaiEvent):
-    """A dataclass created whenever the client receives a new Twitch
-    chat message. All instance attributes must be passed to the
-    constructor on creation.
+class MessageCreateEvent(KasaiEvent):
+    """Event fired when a Twitch IRC message is sent.
 
     .. important::
         This event is not triggered when your bot sends a message.
     """
 
-    message: PrivMessage
+    message: kasai.Message = attr.field()
     """The message that was sent."""
 
     @property
-    def author(self) -> kasai.User:
-        """The message's author.
+    def message_id(self) -> str:
+        """The ID of the sent message."""
+        return self.message.id
 
-        Returns
-        -------
-        kasai.users.User
-        """
+    @property
+    def app(self) -> kasai.TwitchAware:
+        """The base client application."""
+        return self.message.app
 
+    @property
+    def author(self) -> kasai.Viewer:
+        """The user who sent the message."""
         return self.message.author
 
     @property
+    def author_id(self) -> str:
+        """The ID of the user who sent the message."""
+        return self.message.author.id
+
+    @property
     def channel(self) -> kasai.Channel:
-        """The channel the message was sent to.
-
-        Returns
-        -------
-        kasai.channels.Channel
-        """
-
+        """The channel the message was sent to."""
         return self.message.channel
 
     @property
+    def channel_id(self) -> str:
+        """The ID of the channel the message was sent to."""
+        return self.message.channel.id
+
+    @property
+    def bits(self) -> int:
+        """The number of bits the user sent in the message."""
+        return self.message.bits
+
+    @property
     def content(self) -> str:
-        """The content of the message.
-
-        Returns
-        -------
-        builtins.str
-        """
-
+        """The text content of the message."""
         return self.message.content
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class PingEvent(KasaiEvent):
-    """A dataclass created whenever the client receives a PING message
-    from the Twitch server. All instance attributes must be passed to
-    the constructor on creation.
-    """
+    """Event fired when the client receives a PING message."""
+
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    """The base client application."""
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class JoinEvent(KasaiEvent):
-    """A dataclass created whenever the client joins a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
+    """Event fired when the client joins a Twitch channel's chat.
+
+    .. important::
+        To get more information about the channel, use
+        `JoinRoomstateEvent` instead.
     """
 
-    message: JoinMessage
-    """A representation of a JOIN message."""
+    channel: str = attr.field()
+    """The name of the channel the client joined."""
 
-    @property
-    def channel_name(self) -> str:
-        """The name of the channel which was joined.
-
-        Returns
-        -------
-        builtins.str
-        """
-
-        return self.message.channel_name
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
+    """The base client application."""
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
 class PartEvent(KasaiEvent):
-    """A dataclass created whenever the client parts a Twitch channel.
-    All instance attributes must be passed to the constructor on
-    creation.
-    """
+    """Event fired when the client parts (leaves) a Twitch channel's
+    chat."""
 
-    message: PartMessage
-    """A representation of a PART message."""
+    channel: str = attr.field()
+    """The name of the channel the client parted."""
 
-    @property
-    def channel_name(self) -> str:
-        """The name of the channel which was parted.
-
-        Returns
-        -------
-        builtins.str
-        """
-
-        return self.message.channel_name
+    app: kasai.TwitchAware = attr.field(
+        repr=False,
+        eq=False,
+        hash=False,
+        metadata={attr_extensions.SKIP_DEEP_COPY: True},
+    )
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class ClearEvent(KasaiEvent):
-    """A dataclass created whenever a clear command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
+class JoinRoomstateEvent(KasaiEvent):
+    """Event fired when the client receives ROOMSTATE information after
+    joining a channel.
+
+    .. note::
+        This event contains more detailed information regarding the
+        channel the client joined, however as that information does not
+        always get sent from Twitch immediately, it is dispatched with
+        a separate event.
     """
 
-    message: ModActionMessage
-    """A representation of a CLEARCHAT message."""
+    channel: kasai.Channel = attr.field()
+    """The channel the client joined."""
+
+    @property
+    def channel_id(self) -> str:
+        """The ID of the channel the client joined."""
+        return self.channel.id
+
+    @property
+    def app(self) -> kasai.TwitchAware:
+        """The base client instance."""
+        return self.channel.app
+
+    @property
+    def game(self) -> kasai.Game:
+        """The game the channel is currently playing (or most recently
+        played)."""
+        return self.channel.game
+
+    @property
+    def game_id(self) -> str:
+        """The ID of the game the channel is currently playing (or most
+        recently played)."""
+        return self.channel.game.id
+
+    @property
+    def title(self) -> str:
+        """The title of the channel's current (or most recent)
+        stream."""
+        return self.channel.title
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class BanEvent(KasaiEvent):
-    """A dataclass created whenever a ban command is sent to the Twitch
-    channel. All instance attributes must be passed to the constructor
-    on creation.
+class ModActionEvent(KasaiEvent):
+    """Event fired when a moderation action is taken.
+
+    .. note::
+        This currently only supports CLEARCHAT, BAN, and TIMEOUT
+        actions.
     """
 
-    message: ModActionMessage
-    """A representation of a CLEARCHAT message."""
+    channel: kasai.Channel = attr.field()
+    """The channel the mod action was performed in."""
+
+    created_at: dt.datetime = attr.field()
+    """The date and time the mod action was executed."""
 
     @property
-    def target_id(self) -> str:
-        """The target user's ID.
+    def channel_id(self) -> str:
+        """The ID of the channel."""
+        return self.channel.id
 
-        Returns
-        -------
-        builtins.str
-        """
-
-        assert self.message.target_id is not None
-        return self.message.target_id
+    @property
+    def app(self) -> kasai.TwitchAware:
+        """The base client instance."""
+        return self.channel.app
 
 
-@attr_extensions.with_copy
 @attr.define(kw_only=True, weakref_slot=False)
-class TimeoutEvent(KasaiEvent):
-    """A dataclass created whenever a timeout command is sent to the
-    Twitch channel. All instance attributes must be passed to the
-    constructor on creation.
-    """
+class ClearEvent(ModActionEvent):
+    """Event fired when a chat is cleared."""
 
-    message: ModActionMessage
-    """A representation of a CLEARCHAT message."""
 
-    @property
-    def target_id(self) -> str:
-        """The target user's ID.
+@attr.define(kw_only=True, weakref_slot=False)
+class BanEvent(ModActionEvent):
+    """Event fired when a user is banned from a chat channel."""
 
-        Returns
-        -------
-        builtins.str
-        """
-
-        assert self.message.target_id is not None
-        return self.message.target_id
+    user: kasai.User = attr.field()
+    """The user that was banned."""
 
     @property
-    def duration(self) -> int:
-        """The timeout duration.
+    def user_id(self) -> str:
+        """The ID of the user that was banned."""
+        return self.user.id
 
-        Returns
-        -------
-        builtins.int
-        """
 
-        return self.message.duration
+@attr.define(kw_only=True, weakref_slot=False)
+class TimeoutEvent(ModActionEvent):
+    """Event fired when a user is timed out from a chat channel."""
+
+    user: kasai.User = attr.field()
+    """The user that was banned."""
+
+    duration: int = attr.field()
+    """The duration of the timeout, in seconds."""
+
+    @property
+    def user_id(self) -> str:
+        """The ID of the user that was banned."""
+        return self.user.id

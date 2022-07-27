@@ -74,25 +74,21 @@ bot = kasai.GatewayBot(
 )
 
 @bot.listen(hikari.StartedEvent)
-async def on_started(event):
-    await bot.twitch.join(os.environ[&quot;TWITCH_CHANNEL_NAME&quot;])
+async def on_started(event: hikari.StartedEvent):
+    # Connect to your Twitch chat.
+    await bot.twitch.join(&quot;#twitchdev&quot;)
 
 @bot.listen(hikari.GuildMessageCreateEvent)
-async def on_message(event):
+async def on_message(event: hikari.GuildMessageCreateEvent):
+    # Send a message from Discord to Twitch chat.
     if event.content.startswith(&quot;!send&quot;):
-        # Send a message to Twitch chat.
-        channel = await bot.twitch.fetch_channel(os.environ[&quot;TWITCH_CHANNEL_ID&quot;])
-        await channel.send(event.content[6:])
-
-@bot.listen(kasai.JoinRoomstateEvent)
-async def on_join_roomstate(event):
-    # Get information about the channel you just joined.
-    print(f&quot;Joined #{event.channel.name}, playing {event.game.name}&quot;)
+        await bot.twitch.create_message(&quot;#twitchdev&quot;, event.content[6:])
 
 @bot.listen(kasai.MessageCreateEvent)
-async def on_twitch_message(event):
-    # Display message information.
-    print(f&quot;{event.author.name} said {event.content} in {event.channel.name}&quot;)
+async def on_twitch_message(event: kasai.MessageCreateEvent):
+    # Basic Twitch command implementation.
+    if event.content.startswith(&quot;!ping&quot;):
+        await event.message.respond(&quot;Pong!&quot;)
 
 # Run the bot.
 bot.run()

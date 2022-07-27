@@ -64,31 +64,30 @@ dotenv.load_dotenv()
 bot = kasai.GatewayBot(
     os.environ["TOKEN"],
     os.environ["IRC_TOKEN"],
+    os.environ["TWITCH_CLIENT_ID"],
+    os.environ["TWITCH_CLIENT_SECRET"],
 )
 
+@bot.listen(hikari.StartedEvent)
+async def on_started(event: hikari.StartedEvent):
+    # Connect to your Twitch chat.
+    await bot.twitch.join("#twitchdev")
+
 @bot.listen(hikari.GuildMessageCreateEvent)
-async def on_message(event):
-    if event.content == "!start":
-        # Start listening for messages.
-        await bot.start_irc("#channel1", "#channel2")
+async def on_message(event: hikari.GuildMessageCreateEvent):
+    # Send a message from Discord to Twitch chat.
+    if event.content.startswith("!send"):
+        await bot.twitch.create_message("#twitchdev", event.content[6:])
 
-    elif event.content == "!close":
-        # Stop listening for messages.
-        await bot.close_irc()
-
-    elif event.content.startswith("!send"):
-        # Send a message to Twitch chat.
-        await bot.twitch.create_message("#channel1", event.content[6:])
-
-@bot.listen(kasai.PrivMessageCreateEvent)
-async def on_twitch_message(event):
-    # Display message information.
-    print(f"{event.author.name} said {event.content} in {event.channel.name}")
+@bot.listen(kasai.MessageCreateEvent)
+async def on_twitch_message(event: kasai.MessageCreateEvent):
+    # Basic Twitch command implementation.
+    if event.content.startswith("!ping"):
+        await event.message.respond("Pong!")
 
 # Run the bot.
 bot.run()
 ```
-
 
 ## Contributing
 

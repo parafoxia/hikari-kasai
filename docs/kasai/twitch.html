@@ -329,13 +329,13 @@ class TwitchClient:
         Example
         -------
         ```py
-        &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.join(&#34;twitch&#34;, &#34;twitchdev&#34;)
         ```
 
         Example
         -------
         ```py
-        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
         &gt;&gt;&gt; await bot.twitch.join(*channels)
         ```
 
@@ -369,13 +369,13 @@ class TwitchClient:
         Example
         -------
         ```py
-        &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.part(&#34;twitch&#34;, &#34;twitchdev&#34;)
         ```
 
         Example
         -------
         ```py
-        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
         &gt;&gt;&gt; await bot.twitch.part(*channels)
         ```
 
@@ -406,7 +406,7 @@ class TwitchClient:
         -------
         ```py
         &gt;&gt;&gt; await bot.twitch.create_message(
-            &#34;parafoxia&#34;,
+            &#34;twitchdev&#34;,
             &#34;Never gonna give you up!&#34;,
         )
         ```
@@ -445,8 +445,8 @@ class TwitchClient:
         Example
         -------
         ```py
-        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
-        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;twitchdev&#34;)
+        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;141981764&#34;)
         &gt;&gt;&gt; user1 == user2
         True
         ```
@@ -473,9 +473,9 @@ class TwitchClient:
         Example
         -------
         ```py
-        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;141981764&#34;)
         &gt;&gt;&gt; print(channel.username)
-        parafoxia
+        twitchdev
         ```
 
         Parameters
@@ -788,13 +788,13 @@ token.</dd>
         Example
         -------
         ```py
-        &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.join(&#34;twitch&#34;, &#34;twitchdev&#34;)
         ```
 
         Example
         -------
         ```py
-        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
         &gt;&gt;&gt; await bot.twitch.join(*channels)
         ```
 
@@ -828,13 +828,13 @@ token.</dd>
         Example
         -------
         ```py
-        &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; await bot.twitch.part(&#34;twitch&#34;, &#34;twitchdev&#34;)
         ```
 
         Example
         -------
         ```py
-        &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+        &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
         &gt;&gt;&gt; await bot.twitch.part(*channels)
         ```
 
@@ -865,7 +865,7 @@ token.</dd>
         -------
         ```py
         &gt;&gt;&gt; await bot.twitch.create_message(
-            &#34;parafoxia&#34;,
+            &#34;twitchdev&#34;,
             &#34;Never gonna give you up!&#34;,
         )
         ```
@@ -904,8 +904,8 @@ token.</dd>
         Example
         -------
         ```py
-        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
-        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+        &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;twitchdev&#34;)
+        &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;141981764&#34;)
         &gt;&gt;&gt; user1 == user2
         True
         ```
@@ -932,9 +932,9 @@ token.</dd>
         Example
         -------
         ```py
-        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+        &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;141981764&#34;)
         &gt;&gt;&gt; print(channel.username)
-        parafoxia
+        twitchdev
         ```
 
         Parameters
@@ -1063,7 +1063,7 @@ the Discord bot shuts down.</p>
 <div class="desc"><p>Send a message to a Twitch channel.</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.create_message(
-    &quot;parafoxia&quot;,
+    &quot;twitchdev&quot;,
     &quot;Never gonna give you up!&quot;,
 )
 </code></pre>
@@ -1091,7 +1091,7 @@ to.</dd>
     -------
     ```py
     &gt;&gt;&gt; await bot.twitch.create_message(
-        &#34;parafoxia&#34;,
+        &#34;twitchdev&#34;,
         &#34;Never gonna give you up!&#34;,
     )
     ```
@@ -1131,9 +1131,9 @@ to.</dd>
 <dd>
 <div class="desc"><p>Fetches a channel from the Twitch Helix API.</p>
 <h2 id="example">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&quot;606074029&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&quot;141981764&quot;)
 &gt;&gt;&gt; print(channel.username)
-parafoxia
+twitchdev
 </code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
@@ -1157,9 +1157,9 @@ is identical to the user ID of the channel.</dd>
     Example
     -------
     ```py
-    &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;606074029&#34;)
+    &gt;&gt;&gt; channel = await bot.twitch.fetch_channel(&#34;141981764&#34;)
     &gt;&gt;&gt; print(channel.username)
-    parafoxia
+    twitchdev
     ```
 
     Parameters
@@ -1187,8 +1187,8 @@ is identical to the user ID of the channel.</dd>
 <dd>
 <div class="desc"><p>Fetches a user from the Twitch Helix API.</p>
 <h2 id="example">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&quot;parafoxia&quot;)
-&gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&quot;606074029&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&quot;twitchdev&quot;)
+&gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&quot;141981764&quot;)
 &gt;&gt;&gt; user1 == user2
 True
 </code></pre>
@@ -1213,8 +1213,8 @@ while Twitch user IDs are numerical, they are strings.</dd>
     Example
     -------
     ```py
-    &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;parafoxia&#34;)
-    &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;606074029&#34;)
+    &gt;&gt;&gt; user1 = await bot.twitch.fetch_user(&#34;twitchdev&#34;)
+    &gt;&gt;&gt; user2 = await bot.twitch.fetch_user(&#34;141981764&#34;)
     &gt;&gt;&gt; user1 == user2
     True
     ```
@@ -1242,10 +1242,10 @@ while Twitch user IDs are numerical, they are strings.</dd>
 <dd>
 <div class="desc"><p>Joins the given Twitch channels' chats.</p>
 <h2 id="example">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.join(&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.join(&quot;twitch&quot;, &quot;twitchdev&quot;)
 </code></pre>
 <h2 id="example_1">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;twitch&quot;, &quot;twitchdev&quot;)
 &gt;&gt;&gt; await bot.twitch.join(*channels)
 </code></pre>
 <h2 id="parameters">Parameters</h2>
@@ -1268,13 +1268,13 @@ while Twitch user IDs are numerical, they are strings.</dd>
     Example
     -------
     ```py
-    &gt;&gt;&gt; await bot.twitch.join(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; await bot.twitch.join(&#34;twitch&#34;, &#34;twitchdev&#34;)
     ```
 
     Example
     -------
     ```py
-    &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
     &gt;&gt;&gt; await bot.twitch.join(*channels)
     ```
 
@@ -1310,10 +1310,10 @@ while Twitch user IDs are numerical, they are strings.</dd>
 bot down — this is handled automatically.</p>
 </div>
 <h2 id="example">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.part(&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.part(&quot;twitch&quot;, &quot;twitchdev&quot;)
 </code></pre>
 <h2 id="example_1">Example</h2>
-<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;parafoxia&quot;, &quot;twitchdev&quot;)
+<pre><code class="language-py">&gt;&gt;&gt; channels = (&quot;twitch&quot;, &quot;twitchdev&quot;)
 &gt;&gt;&gt; await bot.twitch.part(*channels)
 </code></pre>
 <h2 id="parameters">Parameters</h2>
@@ -1340,13 +1340,13 @@ bot down — this is handled automatically.</p>
     Example
     -------
     ```py
-    &gt;&gt;&gt; await bot.twitch.part(&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; await bot.twitch.part(&#34;twitch&#34;, &#34;twitchdev&#34;)
     ```
 
     Example
     -------
     ```py
-    &gt;&gt;&gt; channels = (&#34;parafoxia&#34;, &#34;twitchdev&#34;)
+    &gt;&gt;&gt; channels = (&#34;twitch&#34;, &#34;twitchdev&#34;)
     &gt;&gt;&gt; await bot.twitch.part(*channels)
     ```
 

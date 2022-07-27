@@ -26,7 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__all__ = ("KasaiError", "NotAlive", "IsAlive", "HelixError", "RequestFailed")
+__all__ = ("KasaiError", "NotAlive", "IsAlive", "HelixError", "RequestFailed", "IrcError", "NotJoined")
 
 
 class KasaiError(Exception):
@@ -57,3 +57,8 @@ class RequestFailed(HelixError):
 
 class IrcError(KasaiError):
     """Exception thrown when something goes wrong regarding IRC."""
+
+
+class NotJoined(IrcError):
+    """Exception thrown when sending a message to a channel the client
+    has not joined."""

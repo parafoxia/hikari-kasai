@@ -89,3 +89,24 @@ class Channel:
         """This channel's username in the format IRC expects it."""
 
         return f"#{self.username}"
+
+    async def send(self, content: str) -> None:
+        """Send a message to this channel.
+
+        Example
+        -------
+        ```py
+        >>> await channel.send("Never gonna give you up!")
+        ```
+
+        Parameters
+        ----------
+        content : str
+            The text content of the message you want to send.
+
+        Returns
+        -------
+        None
+        """
+
+        await self.app.twitch.create_message(self.username, content)

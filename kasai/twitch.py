@@ -300,17 +300,15 @@ class TwitchClient:
 
         Example
         -------
-
         ```py
-        >>> join("parafoxia", "twitchdev")
+        >>> await bot.twitch.join("parafoxia", "twitchdev")
         ```
 
         Example
         -------
-
         ```py
         >>> channels = ("parafoxia", "twitchdev")
-        >>> join(*channels)
+        >>> await bot.twitch.join(*channels)
         ```
 
         Parameters
@@ -342,17 +340,15 @@ class TwitchClient:
 
         Example
         -------
-
         ```py
-        >>> part("parafoxia", "twitchdev")
+        >>> await bot.twitch.part("parafoxia", "twitchdev")
         ```
 
         Example
         -------
-
         ```py
         >>> channels = ("parafoxia", "twitchdev")
-        >>> part(*channels)
+        >>> await bot.twitch.part(*channels)
         ```
 
         Parameters
@@ -375,15 +371,51 @@ class TwitchClient:
         msg = "\r\n".join(f"PART #{c}" for c in channels) + "\r\n"
         await loop.sock_sendall(self._sock, msg.encode("utf-8"))
 
+    async def create_message(self, channel: str, content: str) -> None:
+        """Send a message to a Twitch channel.
+
+        Example
+        -------
+        ```py
+        >>> await bot.twitch.create_message("parafoxia", "Never gonna give you up!")
+        ```
+
+        Parameters
+        ----------
+        channel : str
+            The login username of the channel you want to send a message
+            to.
+        content : str
+            The text content of the message you want to send.
+
+        Returns
+        -------
+        None
+        """
+
+        if self._sock is None:
+            raise kasai.NotAlive("there are no alive IRC websockets")
+
+        channel = channel.strip("#")
+
+        if channel not in self._channels:
+            raise kasai.NotJoined("this client has not joined that channel")
+
+        msg = (
+            f":{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv "
+            f"PRIVMSG #{channel} :{content}\r\n"
+        )
+        loop = asyncio.get_running_loop()
+        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+
     async def fetch_user(self, user: str) -> kasai.User:
         """Fetches a user from the Twitch Helix API.
 
         Example
         -------
-
         ```py
-        >>> user1 = fetch_user("parafoxia")
-        >>> user2 = fetch_user("606074029")
+        >>> user1 = await bot.twitch.fetch_user("parafoxia")
+        >>> user2 = await bot.twitch.fetch_user("606074029")
         >>> user1 == user2
         True
         ```
@@ -407,11 +439,10 @@ class TwitchClient:
     async def fetch_channel(self, channel: str) -> kasai.Channel:
         """Fetches a channel from the Twitch Helix API.
 
-         Example
+        Example
         -------
-
         ```py
-        >>> channel = fetch_channel("606074029")
+        >>> channel = await bot.twitch.fetch_channel("606074029")
         >>> print(channel.username)
         parafoxia
         ```

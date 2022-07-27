@@ -301,13 +301,13 @@ class TwitchClient:
         Example
         -------
         ```py
-        >>> await bot.twitch.join("parafoxia", "twitchdev")
+        >>> await bot.twitch.join("twitch", "twitchdev")
         ```
 
         Example
         -------
         ```py
-        >>> channels = ("parafoxia", "twitchdev")
+        >>> channels = ("twitch", "twitchdev")
         >>> await bot.twitch.join(*channels)
         ```
 
@@ -341,13 +341,13 @@ class TwitchClient:
         Example
         -------
         ```py
-        >>> await bot.twitch.part("parafoxia", "twitchdev")
+        >>> await bot.twitch.part("twitch", "twitchdev")
         ```
 
         Example
         -------
         ```py
-        >>> channels = ("parafoxia", "twitchdev")
+        >>> channels = ("twitch", "twitchdev")
         >>> await bot.twitch.part(*channels)
         ```
 
@@ -378,7 +378,7 @@ class TwitchClient:
         -------
         ```py
         >>> await bot.twitch.create_message(
-            "parafoxia",
+            "twitchdev",
             "Never gonna give you up!",
         )
         ```
@@ -417,8 +417,8 @@ class TwitchClient:
         Example
         -------
         ```py
-        >>> user1 = await bot.twitch.fetch_user("parafoxia")
-        >>> user2 = await bot.twitch.fetch_user("606074029")
+        >>> user1 = await bot.twitch.fetch_user("twitchdev")
+        >>> user2 = await bot.twitch.fetch_user("141981764")
         >>> user1 == user2
         True
         ```
@@ -445,9 +445,9 @@ class TwitchClient:
         Example
         -------
         ```py
-        >>> channel = await bot.twitch.fetch_channel("606074029")
+        >>> channel = await bot.twitch.fetch_channel("141981764")
         >>> print(channel.username)
-        parafoxia
+        twitchdev
         ```
 
         Parameters

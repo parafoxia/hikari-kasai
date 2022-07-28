@@ -15,7 +15,7 @@ INDEX=[
 {
 "ref":"kasai",
 "url":0,
-"doc":" Welcome to the documentation for Kasai v0.7a1! [![PyPi version](https: img.shields.io/pypi/v/hikari-kasai.svg)](https: pypi.python.org/pypi/hikari-kasai/) [![PyPI - Status](https: img.shields.io/pypi/status/hikari-kasai)](https: pypi.python.org/pypi/hikari-kasai/) [![Downloads](https: pepy.tech/badge/hikari-kasai)](https: pepy.tech/project/hikari-kasai) [![GitHub last commit](https: img.shields.io/github/last-commit/parafoxia/hikari-kasai)](https: github.com/parafoxia/hikari-kasai) [![Docs](https: img.shields.io/badge/docs-pdoc-success)](https: parafoxia.github.io/hikari-kasai/kasai/) [![License](https: img.shields.io/github/license/parafoxia/hikari-kasai.svg)](https: github.com/parafoxia/hikari-kasai/blob/main/LICENSE) Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.  Installation To install the latest released version of  Kasai , use the following command:   pip install hikari-kasai   You can also install the latest development version using the following command:   pip install git+https: github.com/parafoxia/hikari-kasai   You may need to prefix these commands with a call to the Python interpreter depending on your OS and Python configuration.  Creating your bot  Kasai provides a subclass for  hikari.GatewayBot that contains methods and attributes for Twitch chat interfacing.   import kasai bot = kasai.GatewayBot( .)   To use  Kasai with command handlers, you will need to create a custom subclass that inherits from both  kasai.GatewayBot and your command handler's bot class. For example, if you want to use  Lightbulb :   import kasai import lightbulb class Bot(kasai.GatewayBot, lightbulb.BotApp):  . bot = Bot( .)    Usage A working implementation could look something like this:   import os import dotenv import hikari import kasai  You will need a .env file for this. dotenv.load_dotenv()  Create the bot. bot = kasai.GatewayBot( os.environ[\"TOKEN\"], os.environ[\"IRC_TOKEN\"], os.environ[\"TWITCH_CLIENT_ID\"], os.environ[\"TWITCH_CLIENT_SECRET\"], ) @bot.listen(hikari.StartedEvent) async def on_started(event: hikari.StartedEvent):  Connect to your Twitch chat. await bot.twitch.join(\"twitchdev\") @bot.listen(hikari.GuildMessageCreateEvent) async def on_message(event: hikari.GuildMessageCreateEvent):  Send a message from Discord to Twitch chat. if event.content.startswith(\"!send\"): await bot.twitch.create_message(\"twitchdev\", event.content[6:]) @bot.listen(kasai.MessageCreateEvent) async def on_twitch_message(event: kasai.MessageCreateEvent):  Basic Twitch command implementation. if event.content.startswith(\"!ping\"): await event.message.respond(\"Pong!\")  Run the bot. bot.run()    Contributing Contributions are very much welcome! To get started:  Familiarise yourself with the [code of conduct](https: github.com/parafoxia/hikari-kasai/blob/main/CODE_OF_CONDUCT.md)  Have a look at the [contributing guide](https: github.com/parafoxia/hikari-kasai/blob/main/CONTRIBUTING.md)  License The  hikari-kasai module for Python is licensed under the [BSD 3-Clause License](https: github.com/parafoxia/hikari-kasai/blob/main/LICENSE)."
+"doc":" Welcome to the documentation for Kasai v0.8a! [![PyPi version](https: img.shields.io/pypi/v/hikari-kasai.svg)](https: pypi.python.org/pypi/hikari-kasai/) [![PyPI - Status](https: img.shields.io/pypi/status/hikari-kasai)](https: pypi.python.org/pypi/hikari-kasai/) [![Downloads](https: pepy.tech/badge/hikari-kasai)](https: pepy.tech/project/hikari-kasai) [![GitHub last commit](https: img.shields.io/github/last-commit/parafoxia/hikari-kasai)](https: github.com/parafoxia/hikari-kasai) [![Docs](https: img.shields.io/badge/docs-pdoc-success)](https: parafoxia.github.io/hikari-kasai/kasai/) [![License](https: img.shields.io/github/license/parafoxia/hikari-kasai.svg)](https: github.com/parafoxia/hikari-kasai/blob/main/LICENSE) Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms. This serves to extend [Hikari](https: pypi.org/project/hikari/), and cannot be used without it.  Installation To install the latest released version of Kasai, use the following command:   pip install hikari-kasai   You can also install the latest development version using the following command:   pip install git+https: github.com/parafoxia/hikari-kasai   You may need to prefix these commands with a call to the Python interpreter depending on your OS and Python configuration.  Creating your bot Kasai provides a subclass for  hikari.GatewayBot that contains methods and attributes for Twitch chat interfacing.   import kasai bot = kasai.GatewayBot( .)   To use Kasai with command handlers, you will need to create a custom subclass that inherits from both  kasai.GatewayBot and your command handler's bot class. For example, if you want to use  Lightbulb :   import kasai import lightbulb class Bot(kasai.GatewayBot, lightbulb.BotApp):  . bot = Bot( .)    Usage A working implementation could look something like this:   import os import dotenv import hikari import kasai  You will need a .env file for this. dotenv.load_dotenv()  Create the bot. bot = kasai.GatewayBot( os.environ[\"TOKEN\"], os.environ[\"IRC_TOKEN\"], os.environ[\"TWITCH_CLIENT_ID\"], os.environ[\"TWITCH_CLIENT_SECRET\"], ) @bot.listen(hikari.StartedEvent) async def on_started(event: hikari.StartedEvent):  Connect to your Twitch chat. await bot.twitch.join(\"twitchdev\") @bot.listen(hikari.GuildMessageCreateEvent) async def on_message(event: hikari.GuildMessageCreateEvent):  Send a message from Discord to Twitch chat. if event.content.startswith(\"!send\"): await bot.twitch.create_message(\"twitchdev\", event.content[6:]) @bot.listen(kasai.MessageCreateEvent) async def on_twitch_message(event: kasai.MessageCreateEvent):  Basic Twitch command implementation. if event.content.startswith(\"!ping\"): await event.message.respond(\"Pong!\")  Run the bot. bot.run()   There are [more examples](https: github.com/parafoxia/hikari-kasai/tree/main/examples) should you wish to see them. It may also be worth looking into how to [speed Hikari up](https: github.com/hikari-py/hikari making-your-application-more-efficient) to get the best performance out of Kasai.  Contributing Contributions are very much welcome! To get started:  Familiarise yourself with the [code of conduct](https: github.com/parafoxia/hikari-kasai/blob/main/CODE_OF_CONDUCT.md)  Have a look at the [contributing guide](https: github.com/parafoxia/hikari-kasai/blob/main/CONTRIBUTING.md)  License The  hikari-kasai module for Python is licensed under the [BSD 3-Clause License](https: github.com/parafoxia/hikari-kasai/blob/main/LICENSE)."
 },
 {
 "ref":"kasai.entity_factory",
@@ -662,52 +662,57 @@ INDEX=[
 {
 "ref":"kasai.users.User.app",
 "url":10,
-"doc":"Client application that models may use for procedures."
+"doc":"The base client application."
 },
 {
 "ref":"kasai.users.User.broadcaster_type",
 "url":10,
-"doc":"A property."
+"doc":"This user's broadcaster type. This can be: -  BroadcasterType.NORMAL -  BroadcasterType.AFFILIATE -  BroadcasterType.PARTNER "
 },
 {
 "ref":"kasai.users.User.description",
 "url":10,
-"doc":"A property."
+"doc":"This user's channel description."
 },
 {
 "ref":"kasai.users.User.display_name",
 "url":10,
-"doc":"A property."
+"doc":"The name this user displays as on Twitch."
 },
 {
 "ref":"kasai.users.User.id",
 "url":10,
-"doc":"A property."
+"doc":"This user's ID."
 },
 {
 "ref":"kasai.users.User.username",
 "url":10,
-"doc":"A property."
+"doc":"This user's login username."
+},
+{
+"ref":"kasai.users.User.login",
+"url":10,
+"doc":"A helper property which provides this username using Twitch naming conventions."
 },
 {
 "ref":"kasai.users.User.offline_image_url",
 "url":10,
-"doc":"A property."
+"doc":"The URL of this user's channel's offline image."
 },
 {
 "ref":"kasai.users.User.profile_image_url",
 "url":10,
-"doc":"A property."
+"doc":"The URL of this user's profile image."
 },
 {
 "ref":"kasai.users.User.type",
 "url":10,
-"doc":"A property."
+"doc":"This user's type. This can be: -  UserType.NORMAL -  UserType.ADMIN -  UserType.GLOBAL_MOD -  UserType.STAFF "
 },
 {
 "ref":"kasai.users.User.created_at",
 "url":10,
-"doc":"A property."
+"doc":"The date and time this user created their account."
 },
 {
 "ref":"kasai.users.Viewer",
@@ -717,81 +722,131 @@ INDEX=[
 {
 "ref":"kasai.users.Viewer.color",
 "url":10,
-"doc":"A property."
+"doc":"The colour this user uses in the channel's chat."
 },
 {
 "ref":"kasai.users.Viewer.colour",
 "url":10,
-"doc":"A property."
+"doc":"An alias for the good ol' Bri'ish. And people who can spell."
 },
 {
 "ref":"kasai.users.Viewer.is_mod",
 "url":10,
-"doc":"A property."
+"doc":"Whether this user is a mod in the channel."
 },
 {
 "ref":"kasai.users.Viewer.is_subscriber",
 "url":10,
-"doc":"A property."
+"doc":"Whether this user is a subsciber of the channel."
 },
 {
 "ref":"kasai.users.Viewer.is_turbo",
 "url":10,
-"doc":"A property."
+"doc":"Whether this user has ads turned off globally."
 },
 {
 "ref":"kasai.users.Viewer.is_broadcaster",
 "url":10,
-"doc":"A property."
+"doc":"Whether this user is the channel's broadcaster."
 },
 {
 "ref":"kasai.users.Viewer.app",
 "url":10,
-"doc":"Client application that models may use for procedures."
+"doc":"The base client application."
 },
 {
 "ref":"kasai.users.Viewer.broadcaster_type",
 "url":10,
-"doc":"A property."
+"doc":"This user's broadcaster type. This can be: -  BroadcasterType.NORMAL -  BroadcasterType.AFFILIATE -  BroadcasterType.PARTNER "
 },
 {
 "ref":"kasai.users.Viewer.description",
 "url":10,
-"doc":"A property."
+"doc":"This user's channel description."
 },
 {
 "ref":"kasai.users.Viewer.display_name",
 "url":10,
-"doc":"A property."
+"doc":"The name this user displays as on Twitch."
 },
 {
 "ref":"kasai.users.Viewer.id",
 "url":10,
-"doc":"A property."
+"doc":"This user's ID."
 },
 {
 "ref":"kasai.users.Viewer.username",
 "url":10,
-"doc":"A property."
+"doc":"This user's login username."
+},
+{
+"ref":"kasai.users.Viewer.login",
+"url":10,
+"doc":"A helper property which provides this username using Twitch naming conventions."
 },
 {
 "ref":"kasai.users.Viewer.offline_image_url",
 "url":10,
-"doc":"A property."
+"doc":"The URL of this user's channel's offline image."
 },
 {
 "ref":"kasai.users.Viewer.profile_image_url",
 "url":10,
-"doc":"A property."
+"doc":"The URL of this user's profile image."
 },
 {
 "ref":"kasai.users.Viewer.type",
 "url":10,
-"doc":"A property."
+"doc":"This user's type. This can be: -  UserType.NORMAL -  UserType.ADMIN -  UserType.GLOBAL_MOD -  UserType.STAFF "
 },
 {
 "ref":"kasai.users.Viewer.created_at",
 "url":10,
-"doc":"A property."
+"doc":"The date and time this user created their account."
+},
+{
+"ref":"kasai.users.UserType",
+"url":10,
+"doc":"An enum representing a user type."
+},
+{
+"ref":"kasai.users.UserType.NORMAL",
+"url":10,
+"doc":"Represents a normal user."
+},
+{
+"ref":"kasai.users.UserType.ADMIN",
+"url":10,
+"doc":"Represents a Twitch admin."
+},
+{
+"ref":"kasai.users.UserType.GLOBAL_MOD",
+"url":10,
+"doc":"Represents a global mod."
+},
+{
+"ref":"kasai.users.UserType.STAFF",
+"url":10,
+"doc":"Represents a Twitch staff member."
+},
+{
+"ref":"kasai.users.BroadcasterType",
+"url":10,
+"doc":"An enum representing a broadcaster type."
+},
+{
+"ref":"kasai.users.BroadcasterType.NORMAL",
+"url":10,
+"doc":"Represents a normal broadcaster."
+},
+{
+"ref":"kasai.users.BroadcasterType.AFFILIATE",
+"url":10,
+"doc":"Represents an affiliated broadcaster."
+},
+{
+"ref":"kasai.users.BroadcasterType.PARTNER",
+"url":10,
+"doc":"Represents a partnered broadcaster."
 }
 ]

@@ -83,7 +83,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -> users.User:
         return users.UserImpl(
             app=self._app,
-            broadcaster_type=payload["broadcaster_type"],
+            broadcaster_type=users.BroadcasterType(payload["broadcaster_type"]),
             description=payload["description"],
             display_name=payload["display_name"],
             id=payload["id"],
@@ -99,7 +99,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
     ) -> users.Viewer:
         return users.ViewerImpl(
             app=self._app,
-            broadcaster_type=payload["broadcaster_type"],
+            broadcaster_type=users.BroadcasterType(payload["broadcaster_type"]),
             description=payload["description"],
             display_name=payload["display_name"],
             id=payload["id"],

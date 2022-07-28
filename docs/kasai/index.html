@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>kasai API documentation</title>
-<meta name="description" content="**Welcome to the documentation for Kasai v0.7a1!** …" />
+<meta name="description" content="**Welcome to the documentation for Kasai v0.8a!** …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,7 +22,7 @@
 <h1 class="title">Package <code>kasai</code></h1>
 </header>
 <section id="section-intro">
-<p><strong>Welcome to the documentation for Kasai v0.7a1!</strong></p>
+<p><strong>Welcome to the documentation for Kasai v0.8a!</strong></p>
 <p><a href="https://pypi.python.org/pypi/hikari-kasai/"><img alt="PyPi version" src="https://img.shields.io/pypi/v/hikari-kasai.svg"></a>
 <a href="https://pypi.python.org/pypi/hikari-kasai/"><img alt="PyPI - Status" src="https://img.shields.io/pypi/status/hikari-kasai"></a>
 <a href="https://pepy.tech/project/hikari-kasai"><img alt="Downloads" src="https://pepy.tech/badge/hikari-kasai"></a>
@@ -30,8 +30,9 @@
 <a href="https://parafoxia.github.io/hikari-kasai/kasai/"><img alt="Docs" src="https://img.shields.io/badge/docs-pdoc-success"></a>
 <a href="https://github.com/parafoxia/hikari-kasai/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/parafoxia/hikari-kasai.svg"></a></p>
 <p>Kasai serves as a bridge between Discord and Twitch, allowing a single bot to interact with both platforms.</p>
+<p>This serves to extend <a href="https://pypi.org/project/hikari/">Hikari</a>, and cannot be used without it.</p>
 <h2 id="installation">Installation</h2>
-<p>To install the latest released version of <em>Kasai</em>, use the following command:</p>
+<p>To install the latest released version of Kasai, use the following command:</p>
 <pre><code class="language-sh">pip install hikari-kasai
 </code></pre>
 <p>You can also install the latest development version using the following command:</p>
@@ -39,12 +40,12 @@
 </code></pre>
 <p>You may need to prefix these commands with a call to the Python interpreter depending on your OS and Python configuration.</p>
 <h2 id="creating-your-bot">Creating your bot</h2>
-<p><em>Kasai</em> provides a subclass for <code>hikari.GatewayBot</code> that contains methods and attributes for Twitch chat interfacing.</p>
+<p>Kasai provides a subclass for <code>hikari.GatewayBot</code> that contains methods and attributes for Twitch chat interfacing.</p>
 <pre><code class="language-py">import kasai
 
 bot = kasai.GatewayBot(...)
 </code></pre>
-<p>To use <em>Kasai</em> with command handlers, you will need to create a custom subclass that inherits from both <code>kasai.GatewayBot</code> and your command handler's bot class.
+<p>To use Kasai with command handlers, you will need to create a custom subclass that inherits from both <code>kasai.GatewayBot</code> and your command handler's bot class.
 For example, if you want to use <em>Lightbulb</em>:</p>
 <pre><code class="language-py">import kasai
 import lightbulb
@@ -93,6 +94,8 @@ async def on_twitch_message(event: kasai.MessageCreateEvent):
 # Run the bot.
 bot.run()
 </code></pre>
+<p>There are <a href="https://github.com/parafoxia/hikari-kasai/tree/main/examples">more examples</a> should you wish to see them.
+It may also be worth looking into how to <a href="https://github.com/hikari-py/hikari#making-your-application-more-efficient">speed Hikari up</a> to get the best performance out of Kasai.</p>
 <h2 id="contributing">Contributing</h2>
 <p>Contributions are very much welcome! To get started:</p>
 <ul>
@@ -136,7 +139,7 @@ bot.run()
 from __future__ import annotations
 
 __productname__ = &#34;hikari-kasai&#34;
-__version__ = &#34;0.7a1&#34;
+__version__ = &#34;0.8a&#34;
 __description__ = &#34;A bridge between Discord and Twitch chat.&#34;
 __url__ = &#34;https://github.com/parafoxia/hikari-kasai&#34;
 __docs__ = &#34;https://parafoxia.github.io/hikari-kasai/kasai&#34;

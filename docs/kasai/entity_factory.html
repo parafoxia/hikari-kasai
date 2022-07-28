@@ -70,27 +70,25 @@ from hikari.internal import data_binding
 
 from kasai import channels, messages, traits, users
 
-_PRIV_PATTERN = re.compile(r&#34;:[^#]*([^ ]*) :(.*)&#34;)
-
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
     __slots__: t.Sequence[str] = ()
 
     @abc.abstractmethod
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_viewer(
         self, payload: data_binding.JSONObject, tags: dict[str, str]
     ) -&gt; users.Viewer:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_channel(
         self, payload: data_binding.JSONObject
     ) -&gt; channels.Channel:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_message(
@@ -100,7 +98,7 @@ class TwitchEntityFactory(EntityFactory, abc.ABC):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -&gt; messages.Message:
-        ...
+        raise NotImplementedError
 
 
 class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
@@ -113,7 +111,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
         return users.UserImpl(
             app=self._app,
-            broadcaster_type=payload[&#34;broadcaster_type&#34;],
+            broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
             description=payload[&#34;description&#34;],
             display_name=payload[&#34;display_name&#34;],
             id=payload[&#34;id&#34;],
@@ -129,7 +127,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
     ) -&gt; users.Viewer:
         return users.ViewerImpl(
             app=self._app,
-            broadcaster_type=payload[&#34;broadcaster_type&#34;],
+            broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
             description=payload[&#34;description&#34;],
             display_name=payload[&#34;display_name&#34;],
             id=payload[&#34;id&#34;],
@@ -138,7 +136,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             profile_image_url=payload[&#34;profile_image_url&#34;],
             type=users.UserType(payload[&#34;type&#34;]),
             created_at=parse_dt(payload[&#34;created_at&#34;]),
-            color=int(tags.get(&#34;color&#34;, &#34;00&#34;)[1:], base=16),
+            color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
             is_mod=bool(int(tags[&#34;mod&#34;])),
             is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
             is_turbo=bool(int(tags[&#34;turbo&#34;])),
@@ -200,19 +198,19 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
 
     @abc.abstractmethod
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_viewer(
         self, payload: data_binding.JSONObject, tags: dict[str, str]
     ) -&gt; users.Viewer:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_channel(
         self, payload: data_binding.JSONObject
     ) -&gt; channels.Channel:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_message(
@@ -222,7 +220,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -&gt; messages.Message:
-        ...</code></pre>
+        raise NotImplementedError</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -248,7 +246,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
 def deserialize_twitch_channel(
     self, payload: data_binding.JSONObject
 ) -&gt; channels.Channel:
-    ...</code></pre>
+    raise NotImplementedError</code></pre>
 </details>
 </dd>
 <dt id="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_message"><code class="name flex">
@@ -268,7 +266,7 @@ def deserialize_twitch_message(
     viewer: users.Viewer,
     channel: channels.Channel,
 ) -&gt; messages.Message:
-    ...</code></pre>
+    raise NotImplementedError</code></pre>
 </details>
 </dd>
 <dt id="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_user"><code class="name flex">
@@ -282,7 +280,7 @@ def deserialize_twitch_message(
 </summary>
 <pre><code class="python">@abc.abstractmethod
 def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
-    ...</code></pre>
+    raise NotImplementedError</code></pre>
 </details>
 </dd>
 <dt id="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_viewer"><code class="name flex">
@@ -298,7 +296,7 @@ def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.
 def deserialize_twitch_viewer(
     self, payload: data_binding.JSONObject, tags: dict[str, str]
 ) -&gt; users.Viewer:
-    ...</code></pre>
+    raise NotImplementedError</code></pre>
 </details>
 </dd>
 </dl>
@@ -324,7 +322,7 @@ def deserialize_twitch_viewer(
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
         return users.UserImpl(
             app=self._app,
-            broadcaster_type=payload[&#34;broadcaster_type&#34;],
+            broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
             description=payload[&#34;description&#34;],
             display_name=payload[&#34;display_name&#34;],
             id=payload[&#34;id&#34;],
@@ -340,7 +338,7 @@ def deserialize_twitch_viewer(
     ) -&gt; users.Viewer:
         return users.ViewerImpl(
             app=self._app,
-            broadcaster_type=payload[&#34;broadcaster_type&#34;],
+            broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
             description=payload[&#34;description&#34;],
             display_name=payload[&#34;display_name&#34;],
             id=payload[&#34;id&#34;],
@@ -349,7 +347,7 @@ def deserialize_twitch_viewer(
             profile_image_url=payload[&#34;profile_image_url&#34;],
             type=users.UserType(payload[&#34;type&#34;]),
             created_at=parse_dt(payload[&#34;created_at&#34;]),
-            color=int(tags.get(&#34;color&#34;, &#34;00&#34;)[1:], base=16),
+            color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
             is_mod=bool(int(tags[&#34;mod&#34;])),
             is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
             is_turbo=bool(int(tags[&#34;turbo&#34;])),
@@ -459,7 +457,7 @@ def deserialize_twitch_viewer(
 <pre><code class="python">def deserialize_twitch_user(self, payload: data_binding.JSONObject) -&gt; users.User:
     return users.UserImpl(
         app=self._app,
-        broadcaster_type=payload[&#34;broadcaster_type&#34;],
+        broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
         description=payload[&#34;description&#34;],
         display_name=payload[&#34;display_name&#34;],
         id=payload[&#34;id&#34;],
@@ -485,7 +483,7 @@ def deserialize_twitch_viewer(
 ) -&gt; users.Viewer:
     return users.ViewerImpl(
         app=self._app,
-        broadcaster_type=payload[&#34;broadcaster_type&#34;],
+        broadcaster_type=users.BroadcasterType(payload[&#34;broadcaster_type&#34;]),
         description=payload[&#34;description&#34;],
         display_name=payload[&#34;display_name&#34;],
         id=payload[&#34;id&#34;],
@@ -494,7 +492,7 @@ def deserialize_twitch_viewer(
         profile_image_url=payload[&#34;profile_image_url&#34;],
         type=users.UserType(payload[&#34;type&#34;]),
         created_at=parse_dt(payload[&#34;created_at&#34;]),
-        color=int(tags.get(&#34;color&#34;, &#34;00&#34;)[1:], base=16),
+        color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
         is_mod=bool(int(tags[&#34;mod&#34;])),
         is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
         is_turbo=bool(int(tags[&#34;turbo&#34;])),

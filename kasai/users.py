@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-__all__ = ("User", "Viewer")
+__all__ = ("User", "Viewer", "UserType", "BroadcasterType")
 
 import abc
 import datetime as dt
@@ -44,13 +44,29 @@ class UserType(enum.Enum):
     """An enum representing a user type."""
 
     NORMAL = ""
-    """"""
+    """Represents a normal user."""
+
     ADMIN = "admin"
-    """"""
+    """Represents a Twitch admin."""
+
     GLOBAL_MOD = "global_mod"
-    """"""
+    """Represents a global mod."""
+
     STAFF = "staff"
-    """"""
+    """Represents a Twitch staff member."""
+
+
+class BroadcasterType(enum.Enum):
+    """An enum representing a broadcaster type."""
+
+    NORMAL = ""
+    """Represents a normal broadcaster."""
+
+    AFFILIATE = "affiliate"
+    """Represents an affiliated broadcaster."""
+
+    PARTNER = "partner"
+    """Represents a partnered broadcaster."""
 
 
 class User(abc.ABC):
@@ -61,52 +77,73 @@ class User(abc.ABC):
     @property
     @abc.abstractmethod
     def app(self) -> traits.TwitchAware:
-        """Client application that models may use for procedures."""
+        """The base client application."""
 
     @property
     @abc.abstractmethod
-    def broadcaster_type(self) -> str:
-        """A property."""
+    def broadcaster_type(self) -> BroadcasterType:
+        """This user's broadcaster type.
+
+        This can be:
+
+        - `BroadcasterType.NORMAL`
+        - `BroadcasterType.AFFILIATE`
+        - `BroadcasterType.PARTNER`
+        """
 
     @property
     @abc.abstractmethod
     def description(self) -> str:
-        """A property."""
+        """This user's channel description."""
 
     @property
     @abc.abstractmethod
     def display_name(self) -> str:
-        """A property."""
+        """The name this user displays as on Twitch."""
 
     @property
     @abc.abstractmethod
     def id(self) -> str:
-        """A property."""
+        """This user's ID."""
 
     @property
     @abc.abstractmethod
     def username(self) -> str:
-        """A property."""
+        """This user's login username."""
+
+    @property
+    def login(self) -> str:
+        """A helper property which provides this username using Twitch
+        naming conventions."""
+        return self.username
 
     @property
     @abc.abstractmethod
     def offline_image_url(self) -> str:
-        """A property."""
+        """The URL of this user's channel's offline image."""
 
     @property
     @abc.abstractmethod
     def profile_image_url(self) -> str:
-        """A property."""
+        """The URL of this user's profile image."""
 
     @property
     @abc.abstractmethod
     def type(self) -> UserType:
-        """A property."""
+        """This user's type.
+
+        This can be:
+
+        - `UserType.NORMAL`
+        - `UserType.ADMIN`
+        - `UserType.GLOBAL_MOD`
+        - `UserType.STAFF`
+        """
 
     @property
     @abc.abstractmethod
     def created_at(self) -> dt.datetime:
-        """A property."""
+        """The date and time this user created their account."""
 
 
 class Viewer(User, abc.ABC):
@@ -120,32 +157,33 @@ class Viewer(User, abc.ABC):
     @property
     @abc.abstractmethod
     def color(self) -> int:
-        """A property."""
+        """The colour this user uses in the channel's chat."""
 
     @property
     def colour(self) -> int:
-        """A property."""
+        """An alias for the good ol' Bri'ish. And people who can
+        spell."""
         return self.color
 
     @property
     @abc.abstractmethod
     def is_mod(self) -> bool:
-        """A property."""
+        """Whether this user is a mod in the channel."""
 
     @property
     @abc.abstractmethod
     def is_subscriber(self) -> bool:
-        """A property."""
+        """Whether this user is a subsciber of the channel."""
 
     @property
     @abc.abstractmethod
     def is_turbo(self) -> bool:
-        """A property."""
+        """Whether this user has ads turned off globally."""
 
     @property
     @abc.abstractmethod
     def is_broadcaster(self) -> bool:
-        """A property."""
+        """Whether this user is the channel's broadcaster."""
 
 
 @attr_extensions.with_copy
@@ -159,34 +197,15 @@ class UserImpl(User):
         hash=False,
         metadata={attr_extensions.SKIP_DEEP_COPY: True},
     )
-    """The client application that models may use for procedures."""
-
-    broadcaster_type: str = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
+    broadcaster_type: BroadcasterType = attr.field(eq=False, hash=False, repr=False)
     description: str = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     display_name: str = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""
-
     id: str = attr.field(hash=True, repr=True)
-    """The ID of this user."""
-
     username: str = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     offline_image_url: str = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     profile_image_url: str = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     type: UserType = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""
 
     def __str__(self) -> str:
         return self.username
@@ -198,16 +217,7 @@ class ViewerImpl(UserImpl, Viewer):
     """Concrete implementation of viewer information."""
 
     color: int = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""
-
     is_mod: bool = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""
-
     is_subscriber: bool = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""
-
     is_turbo: bool = attr.field(eq=False, hash=False, repr=False)
-    """An attribute."""
-
     is_broadcaster: bool = attr.field(eq=False, hash=False, repr=True)
-    """An attribute."""

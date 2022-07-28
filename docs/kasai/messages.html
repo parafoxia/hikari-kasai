@@ -98,8 +98,8 @@ class Message:
     content: str = attr.field(eq=False, hash=False, repr=True)
     &#34;&#34;&#34;The text content of this message.&#34;&#34;&#34;
 
-    async def respond(self, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to this channel this message was sent to.
+    async def respond(self, content: str, *, reply: bool = False) -&gt; None:
+        &#34;&#34;&#34;Sends a message to this channel this message was sent to.
 
         Example
         -------
@@ -107,19 +107,36 @@ class Message:
         &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
         ```
 
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await message.respond(
+            &#34;Never gonna let you down!&#34;,
+            reply=True,
+        )
+        ```
+
         Parameters
         ----------
         content : str
             The text content of the message you want to send.
+
+        Other Parameters
+        ----------------
+        reply : bool
+            Whether to send the message in reply to this one. Defaults
+            to `False`.
+
+            .. versionadded:: 0.8a
 
         Returns
         -------
         None
         &#34;&#34;&#34;
 
-        await self.app.twitch.create_message(self.channel.username, content)
-
-    # TODO: reply</code></pre>
+        await self.app.twitch.create_message(
+            self.channel.username, content, reply_to=self.id if reply else None
+        )</code></pre>
 </details>
 </section>
 <section>
@@ -173,8 +190,8 @@ class Message:
     content: str = attr.field(eq=False, hash=False, repr=True)
     &#34;&#34;&#34;The text content of this message.&#34;&#34;&#34;
 
-    async def respond(self, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to this channel this message was sent to.
+    async def respond(self, content: str, *, reply: bool = False) -&gt; None:
+        &#34;&#34;&#34;Sends a message to this channel this message was sent to.
 
         Example
         -------
@@ -182,19 +199,36 @@ class Message:
         &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
         ```
 
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await message.respond(
+            &#34;Never gonna let you down!&#34;,
+            reply=True,
+        )
+        ```
+
         Parameters
         ----------
         content : str
             The text content of the message you want to send.
+
+        Other Parameters
+        ----------------
+        reply : bool
+            Whether to send the message in reply to this one. Defaults
+            to `False`.
+
+            .. versionadded:: 0.8a
 
         Returns
         -------
         None
         &#34;&#34;&#34;
 
-        await self.app.twitch.create_message(self.channel.username, content)
-
-    # TODO: reply</code></pre>
+        await self.app.twitch.create_message(
+            self.channel.username, content, reply_to=self.id if reply else None
+        )</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
@@ -230,17 +264,34 @@ class Message:
 <h3>Methods</h3>
 <dl>
 <dt id="kasai.messages.Message.respond"><code class="name flex">
-<span>async def <span class="ident">respond</span></span>(<span>self, content: str) ‑> None</span>
+<span>async def <span class="ident">respond</span></span>(<span>self, content: str, *, reply: bool = False) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send a message to this channel this message was sent to.</p>
+<div class="desc"><p>Sends a message to this channel this message was sent to.</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-py">&gt;&gt;&gt; await message.respond(&quot;Never gonna give you up!&quot;)
+</code></pre>
+<h2 id="example_1">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await message.respond(
+    &quot;Never gonna let you down!&quot;,
+    reply=True,
+)
 </code></pre>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>content</code></strong> :&ensp;<code>str</code></dt>
 <dd>The text content of the message you want to send.</dd>
+</dl>
+<h2 id="other-parameters">Other Parameters</h2>
+<dl>
+<dt><strong><code>reply</code></strong> :&ensp;<code>bool</code></dt>
+<dd>
+<p>Whether to send the message in reply to this one. Defaults
+to <code>False</code>.</p>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.8a</p>
+</div>
+</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -251,8 +302,8 @@ class Message:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">async def respond(self, content: str) -&gt; None:
-    &#34;&#34;&#34;Send a message to this channel this message was sent to.
+<pre><code class="python">async def respond(self, content: str, *, reply: bool = False) -&gt; None:
+    &#34;&#34;&#34;Sends a message to this channel this message was sent to.
 
     Example
     -------
@@ -260,17 +311,36 @@ class Message:
     &gt;&gt;&gt; await message.respond(&#34;Never gonna give you up!&#34;)
     ```
 
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await message.respond(
+        &#34;Never gonna let you down!&#34;,
+        reply=True,
+    )
+    ```
+
     Parameters
     ----------
     content : str
         The text content of the message you want to send.
+
+    Other Parameters
+    ----------------
+    reply : bool
+        Whether to send the message in reply to this one. Defaults
+        to `False`.
+
+        .. versionadded:: 0.8a
 
     Returns
     -------
     None
     &#34;&#34;&#34;
 
-    await self.app.twitch.create_message(self.channel.username, content)</code></pre>
+    await self.app.twitch.create_message(
+        self.channel.username, content, reply_to=self.id if reply else None
+    )</code></pre>
 </details>
 </dd>
 </dl>

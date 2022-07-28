@@ -466,8 +466,10 @@ class TwitchClient:
         msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
-    async def create_message(self, channel: str, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to a Twitch channel.
+    async def create_message(
+        self, channel: str, content: str, *, reply_to: str | None = None
+    ) -&gt; None:
+        &#34;&#34;&#34;Sends a message to a Twitch channel.
 
         Example
         -------
@@ -478,6 +480,16 @@ class TwitchClient:
         )
         ```
 
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.create_message(
+            &#34;twitchdev&#34;,
+            &#34;Never gonna let you down!&#34;,
+            reply_to=&#34;885196de-cb67-427a-baa8-82f9b0fcd05f&#34;,
+        )
+        ```
+
         Parameters
         ----------
         channel : str
@@ -485,6 +497,13 @@ class TwitchClient:
             to.
         content : str
             The text content of the message you want to send.
+
+        Other Parameters
+        ----------------
+        reply_to : str | None
+            The Id of the message to reply to. Defaults to `None`.
+
+            .. versionadded:: 0.8a
 
         Returns
         -------
@@ -499,10 +518,8 @@ class TwitchClient:
         if channel not in self._channels:
             raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
-        msg = (
-            f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-            f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
-        )
+        tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
+        msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
         loop = asyncio.get_running_loop()
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
@@ -990,8 +1007,10 @@ token.</dd>
         msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
-    async def create_message(self, channel: str, content: str) -&gt; None:
-        &#34;&#34;&#34;Send a message to a Twitch channel.
+    async def create_message(
+        self, channel: str, content: str, *, reply_to: str | None = None
+    ) -&gt; None:
+        &#34;&#34;&#34;Sends a message to a Twitch channel.
 
         Example
         -------
@@ -1002,6 +1021,16 @@ token.</dd>
         )
         ```
 
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; await bot.twitch.create_message(
+            &#34;twitchdev&#34;,
+            &#34;Never gonna let you down!&#34;,
+            reply_to=&#34;885196de-cb67-427a-baa8-82f9b0fcd05f&#34;,
+        )
+        ```
+
         Parameters
         ----------
         channel : str
@@ -1009,6 +1038,13 @@ token.</dd>
             to.
         content : str
             The text content of the message you want to send.
+
+        Other Parameters
+        ----------------
+        reply_to : str | None
+            The Id of the message to reply to. Defaults to `None`.
+
+            .. versionadded:: 0.8a
 
         Returns
         -------
@@ -1023,10 +1059,8 @@ token.</dd>
         if channel not in self._channels:
             raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
-        msg = (
-            f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-            f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
-        )
+        tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
+        msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
         loop = asyncio.get_running_loop()
         await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
 
@@ -1189,14 +1223,21 @@ the Discord bot shuts down.</p>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.create_message"><code class="name flex">
-<span>async def <span class="ident">create_message</span></span>(<span>self, channel: str, content: str) ‑> None</span>
+<span>async def <span class="ident">create_message</span></span>(<span>self, channel: str, content: str, *, reply_to: str | None = None) ‑> None</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send a message to a Twitch channel.</p>
+<div class="desc"><p>Sends a message to a Twitch channel.</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.create_message(
     &quot;twitchdev&quot;,
     &quot;Never gonna give you up!&quot;,
+)
+</code></pre>
+<h2 id="example_1">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; await bot.twitch.create_message(
+    &quot;twitchdev&quot;,
+    &quot;Never gonna let you down!&quot;,
+    reply_to=&quot;885196de-cb67-427a-baa8-82f9b0fcd05f&quot;,
 )
 </code></pre>
 <h2 id="parameters">Parameters</h2>
@@ -1207,6 +1248,16 @@ to.</dd>
 <dt><strong><code>content</code></strong> :&ensp;<code>str</code></dt>
 <dd>The text content of the message you want to send.</dd>
 </dl>
+<h2 id="other-parameters">Other Parameters</h2>
+<dl>
+<dt><strong><code>reply_to</code></strong> :&ensp;<code>str | None</code></dt>
+<dd>
+<p>The Id of the message to reply to. Defaults to <code>None</code>.</p>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.8a</p>
+</div>
+</dd>
+</dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><code>None</code></dt>
@@ -1216,8 +1267,10 @@ to.</dd>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">async def create_message(self, channel: str, content: str) -&gt; None:
-    &#34;&#34;&#34;Send a message to a Twitch channel.
+<pre><code class="python">async def create_message(
+    self, channel: str, content: str, *, reply_to: str | None = None
+) -&gt; None:
+    &#34;&#34;&#34;Sends a message to a Twitch channel.
 
     Example
     -------
@@ -1228,6 +1281,16 @@ to.</dd>
     )
     ```
 
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; await bot.twitch.create_message(
+        &#34;twitchdev&#34;,
+        &#34;Never gonna let you down!&#34;,
+        reply_to=&#34;885196de-cb67-427a-baa8-82f9b0fcd05f&#34;,
+    )
+    ```
+
     Parameters
     ----------
     channel : str
@@ -1235,6 +1298,13 @@ to.</dd>
         to.
     content : str
         The text content of the message you want to send.
+
+    Other Parameters
+    ----------------
+    reply_to : str | None
+        The Id of the message to reply to. Defaults to `None`.
+
+        .. versionadded:: 0.8a
 
     Returns
     -------
@@ -1249,10 +1319,8 @@ to.</dd>
     if channel not in self._channels:
         raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
-    msg = (
-        f&#34;:{self._nickname}!{self._nickname}@{self._nickname}.tmi.twitch.tv &#34;
-        f&#34;PRIVMSG #{channel} :{content}\r\n&#34;
-    )
+    tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
+    msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
     loop = asyncio.get_running_loop()
     await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
 </details>

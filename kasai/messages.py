@@ -70,8 +70,8 @@ class Message:
     content: str = attr.field(eq=False, hash=False, repr=True)
     """The text content of this message."""
 
-    async def respond(self, content: str) -> None:
-        """Send a message to this channel this message was sent to.
+    async def respond(self, content: str, *, reply: bool = False) -> None:
+        """Sends a message to this channel this message was sent to.
 
         Example
         -------
@@ -79,14 +79,33 @@ class Message:
         >>> await message.respond("Never gonna give you up!")
         ```
 
+        Example
+        -------
+        ```py
+        >>> await message.respond(
+            "Never gonna let you down!",
+            reply=True,
+        )
+        ```
+
         Parameters
         ----------
         content : str
             The text content of the message you want to send.
+
+        Other Parameters
+        ----------------
+        reply : bool
+            Whether to send the message in reply to this one. Defaults
+            to `False`.
+
+            .. versionadded:: 0.8a
 
         Returns
         -------
         None
         """
 
-        await self.app.twitch.create_message(self.channel.username, content)
+        await self.app.twitch.create_message(
+            self.channel.username, content, reply_to=self.id if reply else None
+        )

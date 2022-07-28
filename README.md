@@ -85,7 +85,7 @@ async def on_message(event: hikari.GuildMessageCreateEvent):
 async def on_twitch_message(event: kasai.MessageCreateEvent):
     # Basic Twitch command implementation.
     if event.content.startswith("!ping"):
-        await event.message.respond("Pong!")
+        await event.message.respond("Pong!", reply=True)
 
 # Run the bot.
 bot.run()

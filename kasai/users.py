@@ -57,7 +57,10 @@ class UserType(enum.Enum):
 
 
 class BroadcasterType(enum.Enum):
-    """An enum representing a broadcaster type."""
+    """An enum representing a broadcaster type.
+
+    .. versionadded:: 0.8a
+    """
 
     NORMAL = ""
     """Represents a normal broadcaster."""
@@ -89,6 +92,9 @@ class User(abc.ABC):
         - `BroadcasterType.NORMAL`
         - `BroadcasterType.AFFILIATE`
         - `BroadcasterType.PARTNER`
+
+        .. versionchanged:: 0.8a
+            This is now an enum rather than a string.
         """
 
     @property
@@ -114,7 +120,10 @@ class User(abc.ABC):
     @property
     def login(self) -> str:
         """A helper property which provides this username using Twitch
-        naming conventions."""
+        naming conventions.
+
+        .. versionadded:: 0.8a
+        """
         return self.username
 
     @property

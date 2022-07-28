@@ -85,7 +85,10 @@ class UserType(enum.Enum):
 
 
 class BroadcasterType(enum.Enum):
-    &#34;&#34;&#34;An enum representing a broadcaster type.&#34;&#34;&#34;
+    &#34;&#34;&#34;An enum representing a broadcaster type.
+
+    .. versionadded:: 0.8a
+    &#34;&#34;&#34;
 
     NORMAL = &#34;&#34;
     &#34;&#34;&#34;Represents a normal broadcaster.&#34;&#34;&#34;
@@ -117,6 +120,9 @@ class User(abc.ABC):
         - `BroadcasterType.NORMAL`
         - `BroadcasterType.AFFILIATE`
         - `BroadcasterType.PARTNER`
+
+        .. versionchanged:: 0.8a
+            This is now an enum rather than a string.
         &#34;&#34;&#34;
 
     @property
@@ -142,7 +148,10 @@ class User(abc.ABC):
     @property
     def login(self) -&gt; str:
         &#34;&#34;&#34;A helper property which provides this username using Twitch
-        naming conventions.&#34;&#34;&#34;
+        naming conventions.
+
+        .. versionadded:: 0.8a
+        &#34;&#34;&#34;
         return self.username
 
     @property
@@ -265,13 +274,19 @@ class ViewerImpl(UserImpl, Viewer):
 <span>(</span><span>value, names=None, *, module=None, qualname=None, type=None, start=1)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>An enum representing a broadcaster type.</p></div>
+<div class="desc"><p>An enum representing a broadcaster type.</p>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.8a</p>
+</div></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class BroadcasterType(enum.Enum):
-    &#34;&#34;&#34;An enum representing a broadcaster type.&#34;&#34;&#34;
+    &#34;&#34;&#34;An enum representing a broadcaster type.
+
+    .. versionadded:: 0.8a
+    &#34;&#34;&#34;
 
     NORMAL = &#34;&#34;
     &#34;&#34;&#34;Represents a normal broadcaster.&#34;&#34;&#34;
@@ -331,6 +346,9 @@ class ViewerImpl(UserImpl, Viewer):
         - `BroadcasterType.NORMAL`
         - `BroadcasterType.AFFILIATE`
         - `BroadcasterType.PARTNER`
+
+        .. versionchanged:: 0.8a
+            This is now an enum rather than a string.
         &#34;&#34;&#34;
 
     @property
@@ -356,7 +374,10 @@ class ViewerImpl(UserImpl, Viewer):
     @property
     def login(self) -&gt; str:
         &#34;&#34;&#34;A helper property which provides this username using Twitch
-        naming conventions.&#34;&#34;&#34;
+        naming conventions.
+
+        .. versionadded:: 0.8a
+        &#34;&#34;&#34;
         return self.username
 
     @property
@@ -419,7 +440,11 @@ def app(self) -&gt; traits.TwitchAware:
 <li><code><a title="kasai.users.BroadcasterType.NORMAL" href="#kasai.users.BroadcasterType.NORMAL">BroadcasterType.NORMAL</a></code></li>
 <li><code><a title="kasai.users.BroadcasterType.AFFILIATE" href="#kasai.users.BroadcasterType.AFFILIATE">BroadcasterType.AFFILIATE</a></code></li>
 <li><code><a title="kasai.users.BroadcasterType.PARTNER" href="#kasai.users.BroadcasterType.PARTNER">BroadcasterType.PARTNER</a></code></li>
-</ul></div>
+</ul>
+<div class="admonition versionchanged">
+<p class="admonition-title">Changed in version:&ensp;0.8a</p>
+<p>This is now an enum rather than a string.</p>
+</div></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -434,6 +459,9 @@ def broadcaster_type(self) -&gt; BroadcasterType:
     - `BroadcasterType.NORMAL`
     - `BroadcasterType.AFFILIATE`
     - `BroadcasterType.PARTNER`
+
+    .. versionchanged:: 0.8a
+        This is now an enum rather than a string.
     &#34;&#34;&#34;</code></pre>
 </details>
 </dd>
@@ -492,7 +520,10 @@ def id(self) -&gt; str:
 <dt id="kasai.users.User.login"><code class="name">var <span class="ident">login</span> : str</code></dt>
 <dd>
 <div class="desc"><p>A helper property which provides this username using Twitch
-naming conventions.</p></div>
+naming conventions.</p>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.8a</p>
+</div></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -500,7 +531,10 @@ naming conventions.</p></div>
 <pre><code class="python">@property
 def login(self) -&gt; str:
     &#34;&#34;&#34;A helper property which provides this username using Twitch
-    naming conventions.&#34;&#34;&#34;
+    naming conventions.
+
+    .. versionadded:: 0.8a
+    &#34;&#34;&#34;
     return self.username</code></pre>
 </details>
 </dd>

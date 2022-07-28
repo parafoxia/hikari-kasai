@@ -24,7 +24,7 @@ exclude = ["tests", "kasai/ux.py"]
 code-length = 88
 
 [tool.coverage.report]
-omit = ["kasai/__init__.py", "kasai/ux.py"]
+omit = ["kasai/__init__.py", "kasai/__main__.py", "kasai/ux.py"]
 exclude_lines = [
     "if t.TYPE_CHECKING:",
     "raise NotImplementedError",

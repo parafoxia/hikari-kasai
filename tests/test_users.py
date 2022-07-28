@@ -34,7 +34,7 @@ import pytest
 from dateutil.tz import tzutc
 
 import kasai
-from kasai.users import UserImpl, UserType
+from kasai.users import BroadcasterType, UserImpl, UserType
 
 
 @pytest.fixture()
@@ -42,7 +42,7 @@ def user() -> kasai.User:
     app = kasai.GatewayBot("token", "irc_token", "client_id", "client_secret")
     return UserImpl(
         app=app,
-        broadcaster_type="partner",
+        broadcaster_type=BroadcasterType.PARTNER,
         description="Supporting third-party developers building Twitch integrations from chatbots to game integrations.",
         display_name="TwitchDev",
         id="141981764",
@@ -56,6 +56,7 @@ def user() -> kasai.User:
 
 def test_str(user: kasai.User) -> None:
     assert str(user) == "twitchdev"
+
 
 def test_login_property(user: kasai.User) -> None:
     assert user.login == "twitchdev"

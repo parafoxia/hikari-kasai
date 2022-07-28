@@ -737,7 +737,7 @@ INDEX=[
 {
 "ref":"kasai.users.Viewer.is_subscriber",
 "url":10,
-"doc":"Whether this user is a subsciber of the channel."
+"doc":"Whether this user is a subscriber of the channel."
 },
 {
 "ref":"kasai.users.Viewer.is_turbo",

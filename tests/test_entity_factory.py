@@ -36,7 +36,7 @@ from dateutil.tz import tzutc
 
 import kasai
 from kasai.entity_factory import TwitchEntityFactoryImpl
-from kasai.users import UserType
+from kasai.users import BroadcasterType, UserType
 
 
 @pytest.fixture()
@@ -69,7 +69,7 @@ def test_deserialise_user(
     assert isinstance(user, kasai.User)
 
     assert isinstance(user.app, kasai.GatewayBot)
-    assert user.broadcaster_type == "partner"
+    assert user.broadcaster_type == BroadcasterType.PARTNER
     assert (
         user.description
         == "Supporting third-party developers building Twitch integrations from chatbots to game integrations."
@@ -121,7 +121,7 @@ def test_deserialise_viewer(
     assert isinstance(viewer, kasai.Viewer)
 
     assert isinstance(viewer.app, kasai.GatewayBot)
-    assert viewer.broadcaster_type == "partner"
+    assert viewer.broadcaster_type == BroadcasterType.PARTNER
     assert (
         viewer.description
         == "Supporting third-party developers building Twitch integrations from chatbots to game integrations."

@@ -32,7 +32,6 @@ __all__ = ("TwitchEntityFactory", "TwitchEntityFactoryImpl")
 
 import abc
 import datetime as dt
-import re
 import typing as t
 
 from dateutil.parser import parse as parse_dt

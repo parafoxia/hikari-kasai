@@ -173,7 +173,7 @@ class Viewer(User, abc.ABC):
     @property
     @abc.abstractmethod
     def is_subscriber(self) -> bool:
-        """Whether this user is a subsciber of the channel."""
+        """Whether this user is a subscriber of the channel."""
 
     @property
     @abc.abstractmethod

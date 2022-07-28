@@ -42,27 +42,25 @@ from hikari.internal import data_binding
 
 from kasai import channels, messages, traits, users
 
-_PRIV_PATTERN = re.compile(r":[^#]*([^ ]*) :(.*)")
-
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
     __slots__: t.Sequence[str] = ()
 
     @abc.abstractmethod
     def deserialize_twitch_user(self, payload: data_binding.JSONObject) -> users.User:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_viewer(
         self, payload: data_binding.JSONObject, tags: dict[str, str]
     ) -> users.Viewer:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_channel(
         self, payload: data_binding.JSONObject
     ) -> channels.Channel:
-        ...
+        raise NotImplementedError
 
     @abc.abstractmethod
     def deserialize_twitch_message(
@@ -72,7 +70,7 @@ class TwitchEntityFactory(EntityFactory, abc.ABC):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -> messages.Message:
-        ...
+        raise NotImplementedError
 
 
 class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
@@ -110,7 +108,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             profile_image_url=payload["profile_image_url"],
             type=users.UserType(payload["type"]),
             created_at=parse_dt(payload["created_at"]),
-            color=int(tags.get("color", "00")[1:], base=16),
+            color=int(tags.get("color", "#0")[1:], base=16),
             is_mod=bool(int(tags["mod"])),
             is_subscriber=bool(int(tags["subscriber"])),
             is_turbo=bool(int(tags["turbo"])),

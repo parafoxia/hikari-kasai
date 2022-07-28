@@ -112,6 +112,6 @@ setuptools.setup(
     },
     install_requires=parse_requirements("./requirements/base.txt"),
     python_requires=">=3.8.0,<3.11",
-    packages=setuptools.find_packages(include="kasai"),
+    packages=setuptools.find_packages(include=["kasai"]),
     include_package_data=True,
 )

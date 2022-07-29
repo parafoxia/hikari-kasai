@@ -39,6 +39,7 @@ from hashlib import sha256
 from time import time
 
 import aiohttp
+import irctokens
 from hikari.internal import time as time_
 from hikari.internal.data_binding import JSONObject
 from hikari.internal.ux import TRACE
@@ -76,6 +77,8 @@ class TwitchClient:
         "_channels",
         "_sock",
         "_task",
+        "_d",
+        "_e",
     )
 
     def __init__(
@@ -94,6 +97,7 @@ class TwitchClient:
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
+        self._d = irctokens.stateful.StatefulDecoder()
 
     @property
     def is_alive(self) -> bool:
@@ -214,7 +218,7 @@ class TwitchClient:
         _log.debug("starting IRC listener...")
 
         while True:
-            payload = await loop.sock_recv(self._sock, 512)
+            payload = await loop.sock_recv(self._sock, 1024)
             _log.log(
                 TRACE, f"received IRC payload with size {len(payload)}\n    {payload!r}"
             )
@@ -224,62 +228,57 @@ class TwitchClient:
                 await self._start_irc()
                 break
 
-            load = payload.decode("utf-8").strip()
+            lines = self._d.push(payload)
+            assert lines
 
-            for data in load.split("\n"):
-                if data.startswith("@"):
-                    raw_tags, message = data.split(" ", maxsplit=1)
-                    tags = self._transform_tags(raw_tags)
-                else:
-                    message = data
-                    tags = {}
-
-                if message.startswith("PING"):
+            for line in lines:
+                if line.command == "PING":
                     await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
                     _log.log(TRACE, "received PING, returned PONG")
                     self.app.dispatch(kasai.PingEvent(app=self.app))
                     continue
 
-                if "JOIN" in message:
-                    self._channels.append(cn := message.split()[-1][1:])
+                if line.command == "002" and not self._me:
+                    self._me = await self.fetch_user(line.params[0])
+                    continue
+
+                if line.command == "JOIN":
+                    self._channels.append(cn := line.params[0][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f"joined #{cn}")
                     continue
 
-                if "002" in message and not self._me:
-                    self._me = await self.fetch_user(message.split()[2])
-                    continue
-
-                if "ROOMSTATE" in message and len(tags) > 2:
-                    channel = await self.fetch_channel(tags["room-id"])
+                if line.command == "ROOMSTATE" and line.tags and len(line.tags) > 2:
+                    channel = await self.fetch_channel(line.tags["room-id"])
                     self.app.dispatch(kasai.JoinRoomstateEvent(channel=channel))
                     continue
 
-                if "PART" in message:
-                    self._channels.remove(cn := message.split()[-1][1:])
+                if line.command == "PART":
+                    self._channels.remove(cn := line.params[0][1:])
                     self.app.dispatch(kasai.PartEvent(channel=cn, app=self.app))
                     _log.info(f"parted #{cn}")
                     continue
 
-                if "CLEARCHAT" in message:
+                if line.command == "CLEARCHAT":
                     event: kasai.ClearEvent | kasai.BanEvent | kasai.TimeoutEvent
-                    keys = tags.keys()
+                    assert line.tags
 
-                    channel = await self.fetch_channel(tags["room-id"])
-                    created = dt.datetime.fromtimestamp(int(tags["tmi-sent-ts"]) / 1000)
+                    keys = line.tags.keys()
+                    channel = await self.fetch_channel(line.tags["room-id"])
+                    created = dt.datetime.fromtimestamp(int(line.tags["tmi-sent-ts"]) / 1000)
 
                     if "ban-duration" in keys:
                         event = kasai.TimeoutEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags["target-user-id"]),
-                            duration=int(tags.get("ban-duration", 0)),
+                            user=await self.fetch_user(line.tags["target-user-id"]),
+                            duration=int(line.tags.get("ban-duration", 0)),
                         )
                     elif "target-user-id" in keys:
                         event = kasai.BanEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags["target-user-id"]),
+                            user=await self.fetch_user(line.tags["target-user-id"]),
                         )
                     else:
                         event = kasai.ClearEvent(channel=channel, created_at=created)
@@ -287,15 +286,15 @@ class TwitchClient:
                     self.app.dispatch(event)
                     continue
 
-                if "PRIVMSG" not in message:
+                if line.command != "PRIVMSG":
                     continue
 
-                user = message[(i := message.index("#") + 1) : message.index(" ", i)]
+                assert line.tags
                 result = self.app.entity_factory.deserialize_twitch_message(
-                    message,
-                    tags,
-                    await self._fetch_viewer(user, tags=tags),
-                    await self.fetch_channel(tags["room-id"]),
+                    line.params[-1],
+                    line.tags,
+                    await self._fetch_viewer(line.tags["user-id"], tags=line.tags),
+                    await self.fetch_channel(line.tags["room-id"]),
                 )
                 self.app.dispatch(kasai.MessageCreateEvent(message=result))
 
@@ -410,8 +409,8 @@ class TwitchClient:
             return
 
         loop = asyncio.get_running_loop()
-        msg = "\r\n".join(f"JOIN #{c}" for c in channels) + "\r\n"
-        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+        payload = f"JOIN {','.join(f'#{c}' for c in channels)}\r\n".encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def part(self, *channels: str) -> None:
         """Parts (leaves) the given Twitch channels' chats.
@@ -450,8 +449,8 @@ class TwitchClient:
             return
 
         loop = asyncio.get_running_loop()
-        msg = "\r\n".join(f"PART #{c}" for c in channels) + "\r\n"
-        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+        payload = f"PART {','.join(f'#{c}' for c in channels)}\r\n".encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def create_message(
         self, channel: str, content: str, *, reply_to: str | None = None

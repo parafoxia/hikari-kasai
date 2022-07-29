@@ -107,7 +107,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             profile_image_url=payload["profile_image_url"],
             type=users.UserType(payload["type"]),
             created_at=parse_dt(payload["created_at"]),
-            color=int(tags.get("color", "#0")[1:], base=16),
+            color=int((tags["color"] or "#0")[1:], base=16),
             is_mod=bool(int(tags["mod"])),
             is_subscriber=bool(int(tags["subscriber"])),
             is_turbo=bool(int(tags["turbo"])),
@@ -130,7 +130,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
 
     def deserialize_twitch_message(
         self,
-        message: str,
+        content: str,
         tags: dict[str, str],
         viewer: users.Viewer,
         channel: channels.Channel,
@@ -142,5 +142,5 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             channel=channel,
             created_at=dt.datetime.fromtimestamp(int(tags["tmi-sent-ts"]) / 1000),
             bits=int(tags.get("bits", 0)),
-            content=message.split(":")[-1],
+            content=content,
         )

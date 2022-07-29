@@ -529,6 +529,8 @@ class TwitchClient:
         -------
         kasai.User | None
             The bot user, if available, otherwise `None`.
+
+        .. versionadded:: 0.9a
         """
 
         return self._me

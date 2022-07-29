@@ -70,6 +70,7 @@ class TwitchClient:
         "_client_secret",
         "_api_token",
         "_session",
+        "_me",
         "_irc_token",
         "_nickname",
         "_channels",
@@ -86,6 +87,7 @@ class TwitchClient:
         self._client_secret = client_secret
         self._api_token: str | None = None
         self._session: aiohttp.ClientSession | None = None
+        self._me: kasai.User | None = None
 
         self._irc_token = irc_token
         self._nickname = sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
@@ -243,6 +245,11 @@ class TwitchClient:
                     self._channels.append(cn := message.split()[-1][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f"joined #{cn}")
+                    continue
+
+                if "002" in message and not self._me:
+                    # This is the first instance the username is available.
+                    self._me = await self.fetch_user(message.split()[2])
                     continue
 
                 if "ROOMSTATE" in message and len(tags) > 2:
@@ -504,6 +511,27 @@ class TwitchClient:
         msg = f"{tag}PRIVMSG #{channel} :{content}\r\n"
         loop = asyncio.get_running_loop()
         await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+
+    def get_me(self) -> kasai.User | None:
+        """Return the bot user, if known. This should be available
+        almost immediately, but may be `None` if the request failed for
+        whatever reason.
+
+        Example
+        -------
+        ```py
+        >>> me = bot.twitch.get_me()
+        >>> me.id
+        141981764
+        ```
+
+        Returns
+        -------
+        kasai.User | None
+            The bot user, if available, otherwise `None`.
+        """
+
+        return self._me
 
     async def fetch_user(self, user: str) -> kasai.User:
         """Fetches a user from the Twitch Helix API.

@@ -160,8 +160,7 @@ class TwitchClient:
             }
         else:
             query = "?" + "&".join(
-                "&".join(f"{key}={v}" for v in value)
-                for key, value in options.items()
+                "&".join(f"{key}={v}" for v in value) for key, value in options.items()
             )
             url = kasai.TWITCH_HELIX_URI + route + query
             headers = {
@@ -216,6 +215,9 @@ class TwitchClient:
 
         while True:
             payload = await loop.sock_recv(self._sock, 512)
+            _log.log(
+                TRACE, f"received IRC payload with size {len(payload)}\n    {payload!r}"
+            )
 
             if not payload:
                 _log.warning("IRC socket closed unexpectedly, attempting to restart...")
@@ -223,9 +225,6 @@ class TwitchClient:
                 break
 
             load = payload.decode("utf-8").strip()
-            _log.log(
-                TRACE, f"received IRC payload with size {len(payload)}\n    {load}"
-            )
 
             for data in load.split("\n"):
                 if data.startswith("@"):
@@ -248,7 +247,6 @@ class TwitchClient:
                     continue
 
                 if "002" in message and not self._me:
-                    # This is the first instance the username is available.
                     self._me = await self.fetch_user(message.split()[2])
                     continue
 
@@ -508,9 +506,11 @@ class TwitchClient:
             raise kasai.NotJoined("this client has not joined that channel")
 
         tag = f"@reply-parent-msg-id={reply_to} " if reply_to else ""
-        msg = f"{tag}PRIVMSG #{channel} :{content}\r\n"
+        payload = f"{tag}PRIVMSG #{channel} :{content}\r\n".encode("utf-8")
+
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._sock, msg.encode("utf-8"))
+        _log.log(TRACE, f"sending payload with size {len(payload)}\n    {payload!r}")
+        await loop.sock_sendall(self._sock, payload)
 
     def get_me(self) -> kasai.User | None:
         """Return the bot user, if known. This should be available

@@ -28,24 +28,17 @@
 
 from __future__ import annotations
 
-__all__ = ("Game", "Channel")
+__all__ = ("Channel",)
+
+import typing as t
 
 import attr
 from hikari.internal import attr_extensions
 
 from kasai import traits
 
-
-@attr_extensions.with_copy
-@attr.define(hash=True, kw_only=True, weakref_slot=False)
-class Game:
-    """A class representing a Twitch game."""
-
-    id: str = attr.field(hash=True, repr=True)
-    """This game's ID."""
-
-    name: str = attr.field(eq=False, hash=False, repr=True)
-    """This game's name."""
+if t.TYPE_CHECKING:
+    import kasai
 
 
 @attr_extensions.with_copy
@@ -75,7 +68,7 @@ class Channel:
     """The language this channel is streaming using (according to their
     settings)."""
 
-    game: Game = attr.field(eq=False, hash=False, repr=True)
+    game: kasai.Game = attr.field(eq=False, hash=False, repr=True)
     """The game this channel is playing."""
 
     title: str = attr.field(eq=False, hash=False, repr=True)

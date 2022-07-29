@@ -39,7 +39,7 @@ from hikari.api import EntityFactory
 from hikari.impl import EntityFactoryImpl
 from hikari.internal import data_binding
 
-from kasai import channels, messages, traits, users
+from kasai import channels, games, messages, traits, users
 
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
@@ -123,7 +123,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             username=payload["broadcaster_login"],
             display_name=payload["broadcaster_name"],
             language=payload["broadcaster_language"],
-            game=channels.Game(id=payload["game_id"], name=payload["game_name"]),
+            game=games.Game(id=payload["game_id"], name=payload["game_name"]),
             title=payload["title"],
             delay=payload["delay"],
         )

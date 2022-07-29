@@ -28,38 +28,19 @@
 
 from __future__ import annotations
 
-__productname__ = "hikari-kasai"
-__version__ = "0.9a"
-__description__ = "A bridge between Discord and Twitch chat."
-__url__ = "https://github.com/parafoxia/hikari-kasai"
-__docs__ = "https://parafoxia.github.io/hikari-kasai/kasai"
-__author__ = "Ethan Henderson"
-__author_email__ = "ethan.henderson.1998@gmail.com"
-__license__ = "BSD 3-Clause 'New' or 'Revised' License"
-__bugtracker__ = "https://github.com/parafoxia/hikari-kasai/issues"
-__ci__ = "https://github.com/parafoxia/hikari-kasai/actions"
-__changelog__ = "https://github.com/parafoxia/hikari-kasai/releases"
+__all__ = ("Game",)
 
-TWITCH_HELIX_URI = "https://api.twitch.tv/helix/"
-TWITCH_TOKEN_URI = "https://id.twitch.tv/oauth2/token"  # nosec: B105
+import attr
+from hikari.internal import attr_extensions
 
-from pathlib import Path
 
-readme = Path(__file__).parent.parent / "README.md"
+@attr_extensions.with_copy
+@attr.define(hash=True, kw_only=True, weakref_slot=False)
+class Game:
+    """A class representing a Twitch game."""
 
-# This is only needed for documentation purposes.
-if readme.is_file():
-    __doc__ = (
-        f"### Welcome to the documentation for Kasai v{__version__}!\n\n"
-        + readme.read_text()[9:]
-    )
+    id: str = attr.field(hash=True, repr=True)
+    """This game's ID."""
 
-from kasai.bot import *
-from kasai.channels import *
-from kasai.errors import *
-from kasai.events import *
-from kasai.games import *
-from kasai.messages import *
-from kasai.traits import *
-from kasai.twitch import *
-from kasai.users import *
+    name: str = attr.field(eq=False, hash=False, repr=True)
+    """This game's name."""

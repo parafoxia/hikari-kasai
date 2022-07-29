@@ -94,11 +94,12 @@ class TwitchClient:
 
     __slots__ = (
         &#34;_app&#34;,
-        &#34;_irc_token&#34;,
         &#34;_client_id&#34;,
         &#34;_client_secret&#34;,
         &#34;_api_token&#34;,
         &#34;_session&#34;,
+        &#34;_me&#34;,
+        &#34;_irc_token&#34;,
         &#34;_nickname&#34;,
         &#34;_channels&#34;,
         &#34;_sock&#34;,
@@ -110,12 +111,13 @@ class TwitchClient:
     ) -&gt; None:
         self._app = app
 
-        self._irc_token = irc_token
         self._client_id = client_id
         self._client_secret = client_secret
         self._api_token: str | None = None
         self._session: aiohttp.ClientSession | None = None
+        self._me: kasai.User | None = None
 
+        self._irc_token = irc_token
         self._nickname = sha256(f&#34;{time()}&#34;.encode(&#34;utf-8&#34;)).hexdigest()[:7]
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
@@ -153,6 +155,7 @@ class TwitchClient:
         *,
         auth: bool = False,
         options: dict[str, list[str]],
+        data: dict[str, t.Any] | None = None,
     ) -&gt; list[JSONObject]:
         def stringify(headers: dict[str, str], body: dict[str, str]) -&gt; str:
             string = &#34;\n&#34;.join(
@@ -177,23 +180,23 @@ class TwitchClient:
 
         if auth:
             url = kasai.TWITCH_TOKEN_URI
-            headers = {&#34;Content-Type&#34;: &#34;application/x-www-form-urlencoded&#34;}
+            headers = {&#34;Content-Type&#34;: &#34;application/json&#34;}
             data = {
                 &#34;client_id&#34;: self._client_id,
                 &#34;client_secret&#34;: self._client_secret,
                 &#34;grant_type&#34;: &#34;client_credentials&#34;,
             }
         else:
-            query = &#34;?&#34;
-            for key, value in options.items():
-                query += &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value)
-
+            query = &#34;?&#34; + &#34;&amp;&#34;.join(
+                &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value) for key, value in options.items()
+            )
             url = kasai.TWITCH_HELIX_URI + route + query
             headers = {
                 &#34;Authorization&#34;: f&#34;Bearer {self._api_token}&#34;,
                 &#34;Client-Id&#34;: self._client_id,
+                &#34;Content-Type&#34;: &#34;application/json&#34;,
             }
-            data = {}
+            data = {&#34;data&#34;: data} if data else {}
 
         uuid = time_.uuid()
         trace_enabled = _log.isEnabledFor(TRACE)
@@ -210,7 +213,7 @@ class TwitchClient:
             start = time_.monotonic()
 
         async with self._session.request(
-            method, url, headers=headers, data=data
+            method, url, headers=headers, json=data
         ) as resp:
             res = await resp.json()
 
@@ -240,10 +243,16 @@ class TwitchClient:
 
         while True:
             payload = await loop.sock_recv(self._sock, 512)
-            load = payload.decode(&#34;utf-8&#34;).strip()
             _log.log(
-                TRACE, f&#34;received IRC payload with size {len(payload)}\n    {load}&#34;
+                TRACE, f&#34;received IRC payload with size {len(payload)}\n    {payload!r}&#34;
             )
+
+            if not payload:
+                _log.warning(&#34;IRC socket closed unexpectedly, attempting to restart...&#34;)
+                await self._start_irc()
+                break
+
+            load = payload.decode(&#34;utf-8&#34;).strip()
 
             for data in load.split(&#34;\n&#34;):
                 if data.startswith(&#34;@&#34;):
@@ -263,6 +272,10 @@ class TwitchClient:
                     self._channels.append(cn := message.split()[-1][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f&#34;joined #{cn}&#34;)
+                    continue
+
+                if &#34;002&#34; in message and not self._me:
+                    self._me = await self.fetch_user(message.split()[2])
                     continue
 
                 if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
@@ -314,28 +327,17 @@ class TwitchClient:
                 )
                 self.app.dispatch(kasai.MessageCreateEvent(message=result))
 
-    async def start(self) -&gt; None:
-        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
-        the Discord bot starts.
-
-        Returns
-        -------
-        None
-        &#34;&#34;&#34;
-
-        _log.info(&#34;starting Twitch services...&#34;)
-
+    async def _start_api(self) -&gt; None:
         if self.is_alive:
             raise kasai.IsAlive(&#34;a client session is already alive&#34;)
 
-        # Enable API requests.
         self._session = aiohttp.ClientSession()
 
         res = await self._request(&#34;POST&#34;, &#34;&#34;, auth=True, options={})
         self._api_token = res[0][&#34;access_token&#34;]
-        _log.info(&#34;Helix API is ready to use&#34;)
+        _log.info(&#34;api.twitch.tv/helix is ready&#34;)
 
-        # Open an IRC websocket.
+    async def _start_irc(self) -&gt; None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
@@ -358,9 +360,22 @@ class TwitchClient:
 
         self._task = loop.create_task(self._listen())
         self._task.add_done_callback(end_task)
-        _log.info(&#34;IRC listener ready to receive messages&#34;)
+        _log.info(&#34;irc.chat.twitch.tv is ready&#34;)
 
-        # Finish up.
+    async def start(self) -&gt; None:
+        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
+        the Discord bot starts.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
+
+        _log.info(&#34;starting Twitch services...&#34;)
+
+        await self._start_api()
+        await self._start_irc()
+
         _log.info(&#34;successfully started all Twitch services!&#34;)
 
     async def close(self) -&gt; None:
@@ -519,9 +534,34 @@ class TwitchClient:
             raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
         tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
-        msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
+        payload = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;.encode(&#34;utf-8&#34;)
+
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        _log.log(TRACE, f&#34;sending payload with size {len(payload)}\n    {payload!r}&#34;)
+        await loop.sock_sendall(self._sock, payload)
+
+    def get_me(self) -&gt; kasai.User | None:
+        &#34;&#34;&#34;Return the bot user, if known. This should be available
+        almost immediately, but may be `None` if the request failed for
+        whatever reason.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; me = bot.twitch.get_me()
+        &gt;&gt;&gt; me.id
+        141981764
+        ```
+
+        Returns
+        -------
+        kasai.User | None
+            The bot user, if available, otherwise `None`.
+
+        .. versionadded:: 0.9a
+        &#34;&#34;&#34;
+
+        return self._me
 
     async def fetch_user(self, user: str) -&gt; kasai.User:
         &#34;&#34;&#34;Fetches a user from the Twitch Helix API.
@@ -548,7 +588,7 @@ class TwitchClient:
         &#34;&#34;&#34;
 
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
-        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
         return self.app.entity_factory.deserialize_twitch_user(payload[0])
 
     async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
@@ -575,14 +615,14 @@ class TwitchClient:
             The fetched channel.
         &#34;&#34;&#34;
 
-        payload = await self.app.twitch._request(
+        payload = await self._request(
             &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
         )
         return self.app.entity_factory.deserialize_twitch_channel(payload[0])
 
     async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
-        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
         return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
 </details>
 </section>
@@ -635,11 +675,12 @@ token.</dd>
 
     __slots__ = (
         &#34;_app&#34;,
-        &#34;_irc_token&#34;,
         &#34;_client_id&#34;,
         &#34;_client_secret&#34;,
         &#34;_api_token&#34;,
         &#34;_session&#34;,
+        &#34;_me&#34;,
+        &#34;_irc_token&#34;,
         &#34;_nickname&#34;,
         &#34;_channels&#34;,
         &#34;_sock&#34;,
@@ -651,12 +692,13 @@ token.</dd>
     ) -&gt; None:
         self._app = app
 
-        self._irc_token = irc_token
         self._client_id = client_id
         self._client_secret = client_secret
         self._api_token: str | None = None
         self._session: aiohttp.ClientSession | None = None
+        self._me: kasai.User | None = None
 
+        self._irc_token = irc_token
         self._nickname = sha256(f&#34;{time()}&#34;.encode(&#34;utf-8&#34;)).hexdigest()[:7]
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
@@ -694,6 +736,7 @@ token.</dd>
         *,
         auth: bool = False,
         options: dict[str, list[str]],
+        data: dict[str, t.Any] | None = None,
     ) -&gt; list[JSONObject]:
         def stringify(headers: dict[str, str], body: dict[str, str]) -&gt; str:
             string = &#34;\n&#34;.join(
@@ -718,23 +761,23 @@ token.</dd>
 
         if auth:
             url = kasai.TWITCH_TOKEN_URI
-            headers = {&#34;Content-Type&#34;: &#34;application/x-www-form-urlencoded&#34;}
+            headers = {&#34;Content-Type&#34;: &#34;application/json&#34;}
             data = {
                 &#34;client_id&#34;: self._client_id,
                 &#34;client_secret&#34;: self._client_secret,
                 &#34;grant_type&#34;: &#34;client_credentials&#34;,
             }
         else:
-            query = &#34;?&#34;
-            for key, value in options.items():
-                query += &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value)
-
+            query = &#34;?&#34; + &#34;&amp;&#34;.join(
+                &#34;&amp;&#34;.join(f&#34;{key}={v}&#34; for v in value) for key, value in options.items()
+            )
             url = kasai.TWITCH_HELIX_URI + route + query
             headers = {
                 &#34;Authorization&#34;: f&#34;Bearer {self._api_token}&#34;,
                 &#34;Client-Id&#34;: self._client_id,
+                &#34;Content-Type&#34;: &#34;application/json&#34;,
             }
-            data = {}
+            data = {&#34;data&#34;: data} if data else {}
 
         uuid = time_.uuid()
         trace_enabled = _log.isEnabledFor(TRACE)
@@ -751,7 +794,7 @@ token.</dd>
             start = time_.monotonic()
 
         async with self._session.request(
-            method, url, headers=headers, data=data
+            method, url, headers=headers, json=data
         ) as resp:
             res = await resp.json()
 
@@ -781,10 +824,16 @@ token.</dd>
 
         while True:
             payload = await loop.sock_recv(self._sock, 512)
-            load = payload.decode(&#34;utf-8&#34;).strip()
             _log.log(
-                TRACE, f&#34;received IRC payload with size {len(payload)}\n    {load}&#34;
+                TRACE, f&#34;received IRC payload with size {len(payload)}\n    {payload!r}&#34;
             )
+
+            if not payload:
+                _log.warning(&#34;IRC socket closed unexpectedly, attempting to restart...&#34;)
+                await self._start_irc()
+                break
+
+            load = payload.decode(&#34;utf-8&#34;).strip()
 
             for data in load.split(&#34;\n&#34;):
                 if data.startswith(&#34;@&#34;):
@@ -804,6 +853,10 @@ token.</dd>
                     self._channels.append(cn := message.split()[-1][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f&#34;joined #{cn}&#34;)
+                    continue
+
+                if &#34;002&#34; in message and not self._me:
+                    self._me = await self.fetch_user(message.split()[2])
                     continue
 
                 if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
@@ -855,28 +908,17 @@ token.</dd>
                 )
                 self.app.dispatch(kasai.MessageCreateEvent(message=result))
 
-    async def start(self) -&gt; None:
-        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
-        the Discord bot starts.
-
-        Returns
-        -------
-        None
-        &#34;&#34;&#34;
-
-        _log.info(&#34;starting Twitch services...&#34;)
-
+    async def _start_api(self) -&gt; None:
         if self.is_alive:
             raise kasai.IsAlive(&#34;a client session is already alive&#34;)
 
-        # Enable API requests.
         self._session = aiohttp.ClientSession()
 
         res = await self._request(&#34;POST&#34;, &#34;&#34;, auth=True, options={})
         self._api_token = res[0][&#34;access_token&#34;]
-        _log.info(&#34;Helix API is ready to use&#34;)
+        _log.info(&#34;api.twitch.tv/helix is ready&#34;)
 
-        # Open an IRC websocket.
+    async def _start_irc(self) -&gt; None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(False)
 
@@ -899,9 +941,22 @@ token.</dd>
 
         self._task = loop.create_task(self._listen())
         self._task.add_done_callback(end_task)
-        _log.info(&#34;IRC listener ready to receive messages&#34;)
+        _log.info(&#34;irc.chat.twitch.tv is ready&#34;)
 
-        # Finish up.
+    async def start(self) -&gt; None:
+        &#34;&#34;&#34;Start all Twitch services. This is called automatically when
+        the Discord bot starts.
+
+        Returns
+        -------
+        None
+        &#34;&#34;&#34;
+
+        _log.info(&#34;starting Twitch services...&#34;)
+
+        await self._start_api()
+        await self._start_irc()
+
         _log.info(&#34;successfully started all Twitch services!&#34;)
 
     async def close(self) -&gt; None:
@@ -1060,9 +1115,34 @@ token.</dd>
             raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
         tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
-        msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
+        payload = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;.encode(&#34;utf-8&#34;)
+
         loop = asyncio.get_running_loop()
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        _log.log(TRACE, f&#34;sending payload with size {len(payload)}\n    {payload!r}&#34;)
+        await loop.sock_sendall(self._sock, payload)
+
+    def get_me(self) -&gt; kasai.User | None:
+        &#34;&#34;&#34;Return the bot user, if known. This should be available
+        almost immediately, but may be `None` if the request failed for
+        whatever reason.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; me = bot.twitch.get_me()
+        &gt;&gt;&gt; me.id
+        141981764
+        ```
+
+        Returns
+        -------
+        kasai.User | None
+            The bot user, if available, otherwise `None`.
+
+        .. versionadded:: 0.9a
+        &#34;&#34;&#34;
+
+        return self._me
 
     async def fetch_user(self, user: str) -&gt; kasai.User:
         &#34;&#34;&#34;Fetches a user from the Twitch Helix API.
@@ -1089,7 +1169,7 @@ token.</dd>
         &#34;&#34;&#34;
 
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
-        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
         return self.app.entity_factory.deserialize_twitch_user(payload[0])
 
     async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
@@ -1116,14 +1196,14 @@ token.</dd>
             The fetched channel.
         &#34;&#34;&#34;
 
-        payload = await self.app.twitch._request(
+        payload = await self._request(
             &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
         )
         return self.app.entity_factory.deserialize_twitch_channel(payload[0])
 
     async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
-        payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+        payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
         return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
 </details>
 <h3>Instance variables</h3>
@@ -1320,9 +1400,11 @@ to.</dd>
         raise kasai.NotJoined(&#34;this client has not joined that channel&#34;)
 
     tag = f&#34;@reply-parent-msg-id={reply_to} &#34; if reply_to else &#34;&#34;
-    msg = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;
+    payload = f&#34;{tag}PRIVMSG #{channel} :{content}\r\n&#34;.encode(&#34;utf-8&#34;)
+
     loop = asyncio.get_running_loop()
-    await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+    _log.log(TRACE, f&#34;sending payload with size {len(payload)}\n    {payload!r}&#34;)
+    await loop.sock_sendall(self._sock, payload)</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.fetch_channel"><code class="name flex">
@@ -1375,7 +1457,7 @@ is identical to the user ID of the channel.</dd>
         The fetched channel.
     &#34;&#34;&#34;
 
-    payload = await self.app.twitch._request(
+    payload = await self._request(
         &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
     )
     return self.app.entity_factory.deserialize_twitch_channel(payload[0])</code></pre>
@@ -1432,8 +1514,56 @@ while Twitch user IDs are numerical, they are strings.</dd>
     &#34;&#34;&#34;
 
     key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
-    payload = await self.app.twitch._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+    payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
     return self.app.entity_factory.deserialize_twitch_user(payload[0])</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.get_me"><code class="name flex">
+<span>def <span class="ident">get_me</span></span>(<span>self) ‑> <a title="kasai.users.User" href="users.html#kasai.users.User">User</a> | None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return the bot user, if known. This should be available
+almost immediately, but may be <code>None</code> if the request failed for
+whatever reason.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; me = bot.twitch.get_me()
+&gt;&gt;&gt; me.id
+141981764
+</code></pre>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>kasai.User | None</code></dt>
+<dd>The bot user, if available, otherwise <code>None</code>.</dd>
+</dl>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.9a</p>
+</div></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_me(self) -&gt; kasai.User | None:
+    &#34;&#34;&#34;Return the bot user, if known. This should be available
+    almost immediately, but may be `None` if the request failed for
+    whatever reason.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; me = bot.twitch.get_me()
+    &gt;&gt;&gt; me.id
+    141981764
+    ```
+
+    Returns
+    -------
+    kasai.User | None
+        The bot user, if available, otherwise `None`.
+
+    .. versionadded:: 0.9a
+    &#34;&#34;&#34;
+
+    return self._me</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.join"><code class="name flex">
@@ -1597,42 +1727,9 @@ the Discord bot starts.</p>
 
     _log.info(&#34;starting Twitch services...&#34;)
 
-    if self.is_alive:
-        raise kasai.IsAlive(&#34;a client session is already alive&#34;)
+    await self._start_api()
+    await self._start_irc()
 
-    # Enable API requests.
-    self._session = aiohttp.ClientSession()
-
-    res = await self._request(&#34;POST&#34;, &#34;&#34;, auth=True, options={})
-    self._api_token = res[0][&#34;access_token&#34;]
-    _log.info(&#34;Helix API is ready to use&#34;)
-
-    # Open an IRC websocket.
-    self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self._sock.setblocking(False)
-
-    loop = asyncio.get_running_loop()
-    await loop.sock_connect(self._sock, (&#34;irc.chat.twitch.tv&#34;, 6667))
-    _log.debug(f&#34;connected to {self._sock.getpeername()}&#34;)
-    await loop.sock_sendall(
-        self._sock,
-        (
-            f&#34;PASS {self._irc_token}\r\nNICK {self._nickname}\r\n&#34;
-            &#34;CAP REQ :twitch.tv/commands twitch.tv/tags\r\n&#34;
-        ).encode(),
-    )
-
-    def end_task(task: asyncio.Task[None]) -&gt; None:
-        try:
-            task.result()
-        except asyncio.CancelledError:
-            ...
-
-    self._task = loop.create_task(self._listen())
-    self._task.add_done_callback(end_task)
-    _log.info(&#34;IRC listener ready to receive messages&#34;)
-
-    # Finish up.
     _log.info(&#34;successfully started all Twitch services!&#34;)</code></pre>
 </details>
 </dd>
@@ -1708,6 +1805,7 @@ setTimeout(() => input.focus(), 100);
 <li><code><a title="kasai.twitch.TwitchClient.create_message" href="#kasai.twitch.TwitchClient.create_message">create_message</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.fetch_channel" href="#kasai.twitch.TwitchClient.fetch_channel">fetch_channel</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.fetch_user" href="#kasai.twitch.TwitchClient.fetch_user">fetch_user</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.get_me" href="#kasai.twitch.TwitchClient.get_me">get_me</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.is_alive" href="#kasai.twitch.TwitchClient.is_alive">is_alive</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.is_authorised" href="#kasai.twitch.TwitchClient.is_authorised">is_authorised</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.join" href="#kasai.twitch.TwitchClient.join">join</a></code></li>

@@ -67,7 +67,7 @@ from hikari.api import EntityFactory
 from hikari.impl import EntityFactoryImpl
 from hikari.internal import data_binding
 
-from kasai import channels, messages, traits, users
+from kasai import channels, games, messages, traits, users
 
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
@@ -151,7 +151,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             username=payload[&#34;broadcaster_login&#34;],
             display_name=payload[&#34;broadcaster_name&#34;],
             language=payload[&#34;broadcaster_language&#34;],
-            game=channels.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
+            game=games.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
             title=payload[&#34;title&#34;],
             delay=payload[&#34;delay&#34;],
         )
@@ -362,7 +362,7 @@ def deserialize_twitch_viewer(
             username=payload[&#34;broadcaster_login&#34;],
             display_name=payload[&#34;broadcaster_name&#34;],
             language=payload[&#34;broadcaster_language&#34;],
-            game=channels.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
+            game=games.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
             title=payload[&#34;title&#34;],
             delay=payload[&#34;delay&#34;],
         )
@@ -411,7 +411,7 @@ def deserialize_twitch_viewer(
         username=payload[&#34;broadcaster_login&#34;],
         display_name=payload[&#34;broadcaster_name&#34;],
         language=payload[&#34;broadcaster_language&#34;],
-        game=channels.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
+        game=games.Game(id=payload[&#34;game_id&#34;], name=payload[&#34;game_name&#34;]),
         title=payload[&#34;title&#34;],
         delay=payload[&#34;delay&#34;],
     )</code></pre>

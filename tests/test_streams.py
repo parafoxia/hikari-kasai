@@ -66,7 +66,7 @@ def stream() -> kasai.Stream:
 
 def test_uptime_property(stream: kasai.Stream) -> None:
     # Need to give it an operating window.
-    assert dt.timedelta(seconds=3600) < stream.uptime < dt.timedelta(seconds=3605)
+    assert dt.timedelta(seconds=3600) <= stream.uptime <= dt.timedelta(seconds=3605)
 
 
 def test_get_thumbnail_url(stream: kasai.Stream) -> None:

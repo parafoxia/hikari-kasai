@@ -63,6 +63,10 @@ class RequestFailed(HelixError):
         super().__init__(f"{code}: {message}")
 
 
+class NotFound(HelixError):
+    """Exception thrown when a requested resource could not be found."""
+
+
 class IrcError(KasaiError):
     """Exception thrown when something goes wrong regarding IRC."""
 

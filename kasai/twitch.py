@@ -45,6 +45,7 @@ from hikari.internal.data_binding import JSONObject
 from hikari.internal.ux import TRACE
 
 import kasai
+from kasai.errors import NotFound
 
 _log = logging.getLogger(__name__)
 
@@ -562,6 +563,10 @@ class TwitchClient:
 
         key = "id" if user.isdigit() else "login"
         payload = await self._request("GET", "users", options={key: [user]})
+
+        if not payload:
+            raise NotFound(f"no user of ID or login '{user}' exists")
+
         return self.app.entity_factory.deserialize_twitch_user(payload[0])
 
     async def fetch_channel(self, channel: str) -> kasai.Channel:
@@ -591,11 +596,19 @@ class TwitchClient:
         payload = await self._request(
             "GET", "channels", options={"broadcaster_id": [channel]}
         )
+
+        if not payload:
+            raise NotFound(f"no channel of '{channel}' exists")
+
         return self.app.entity_factory.deserialize_twitch_channel(payload[0])
 
     async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -> kasai.Viewer:
         key = "id" if user.isdigit() else "login"
         payload = await self._request("GET", "users", options={key: [user]})
+
+        if not payload:
+            raise NotFound(f"no user by ID or login '{user}' exists")
+
         return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)
 
     async def fetch_stream(self, user: str) -> kasai.Stream:
@@ -625,4 +638,8 @@ class TwitchClient:
 
         key = "user_id" if user.isdigit() else "user_login"
         payload = await self._request("GET", "streams", options={key: [user]})
+
+        if not payload:
+            raise NotFound(f"no stream by a channel of ID or login '{user}' exists")
+
         return self.app.entity_factory.deserialize_twitch_stream(payload[0])

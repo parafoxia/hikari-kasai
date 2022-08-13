@@ -91,6 +91,10 @@ class RequestFailed(HelixError):
         super().__init__(f&#34;{code}: {message}&#34;)
 
 
+class NotFound(HelixError):
+    &#34;&#34;&#34;Exception thrown when a requested resource could not be found.&#34;&#34;&#34;
+
+
 class IrcError(KasaiError):
     &#34;&#34;&#34;Exception thrown when something goes wrong regarding IRC.&#34;&#34;&#34;
 
@@ -132,6 +136,7 @@ Helix API.</p></div>
 </ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
+<li>kasai.errors.NotFound</li>
 <li><a title="kasai.errors.RequestFailed" href="#kasai.errors.RequestFailed">RequestFailed</a></li>
 </ul>
 </dd>

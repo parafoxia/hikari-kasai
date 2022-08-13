@@ -124,6 +124,8 @@ class Channel:
         -------
         kasai.Stream
             The fetched stream.
+
+        .. versionadded:: 0.10a
         """
 
         return await self.app.twitch.fetch_stream(self.id)

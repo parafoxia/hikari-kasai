@@ -634,6 +634,8 @@ class TwitchClient:
         -------
         kasai.Stream
             The fetched stream.
+
+        .. versionadded:: 0.10a
         """
 
         key = "user_id" if user.isdigit() else "user_login"

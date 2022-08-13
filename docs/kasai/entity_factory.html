@@ -67,7 +67,7 @@ from hikari.api import EntityFactory
 from hikari.impl import EntityFactoryImpl
 from hikari.internal import data_binding
 
-from kasai import channels, games, messages, traits, users
+from kasai import channels, games, messages, streams, traits, users
 
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
@@ -97,6 +97,12 @@ class TwitchEntityFactory(EntityFactory, abc.ABC):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -&gt; messages.Message:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -&gt; streams.Stream:
         raise NotImplementedError
 
 
@@ -135,7 +141,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             profile_image_url=payload[&#34;profile_image_url&#34;],
             type=users.UserType(payload[&#34;type&#34;]),
             created_at=parse_dt(payload[&#34;created_at&#34;]),
-            color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
+            color=int((tags[&#34;color&#34;] or &#34;#0&#34;)[1:], base=16),
             is_mod=bool(int(tags[&#34;mod&#34;])),
             is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
             is_turbo=bool(int(tags[&#34;turbo&#34;])),
@@ -158,7 +164,7 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
 
     def deserialize_twitch_message(
         self,
-        message: str,
+        content: str,
         tags: dict[str, str],
         viewer: users.Viewer,
         channel: channels.Channel,
@@ -170,7 +176,33 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             channel=channel,
             created_at=dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000),
             bits=int(tags.get(&#34;bits&#34;, 0)),
-            content=message.split(&#34;:&#34;)[-1],
+            content=content,
+        )
+
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -&gt; streams.Stream:
+        return streams.Stream(
+            app=self._app,
+            id=payload[&#34;id&#34;],
+            channel=channels.Channel(
+                app=self._app,
+                id=payload[&#34;user_id&#34;],
+                username=payload[&#34;user_login&#34;],
+                display_name=payload[&#34;user_name&#34;],
+                language=payload[&#34;language&#34;],
+                game=games.Game(
+                    id=payload[&#34;game_id&#34;],
+                    name=payload[&#34;game_name&#34;],
+                ),
+                title=payload[&#34;title&#34;],
+                delay=None,
+            ),
+            type=streams.StreamType(payload[&#34;type&#34;]),
+            viewer_count=payload[&#34;viewer_count&#34;],
+            created_at=parse_dt(payload[&#34;started_at&#34;]),
+            is_mature=payload[&#34;is_mature&#34;],
+            thumbnail_url=payload[&#34;thumbnail_url&#34;],
         )</code></pre>
 </details>
 </section>
@@ -219,6 +251,12 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -&gt; messages.Message:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -&gt; streams.Stream:
         raise NotImplementedError</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -265,6 +303,22 @@ def deserialize_twitch_message(
     viewer: users.Viewer,
     channel: channels.Channel,
 ) -&gt; messages.Message:
+    raise NotImplementedError</code></pre>
+</details>
+</dd>
+<dt id="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_stream"><code class="name flex">
+<span>def <span class="ident">deserialize_twitch_stream</span></span>(<span>self, payload: data_binding.JSONObject) ‑> <a title="kasai.streams.Stream" href="streams.html#kasai.streams.Stream">Stream</a></span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@abc.abstractmethod
+def deserialize_twitch_stream(
+    self, payload: data_binding.JSONObject
+) -&gt; streams.Stream:
     raise NotImplementedError</code></pre>
 </details>
 </dd>
@@ -346,7 +400,7 @@ def deserialize_twitch_viewer(
             profile_image_url=payload[&#34;profile_image_url&#34;],
             type=users.UserType(payload[&#34;type&#34;]),
             created_at=parse_dt(payload[&#34;created_at&#34;]),
-            color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
+            color=int((tags[&#34;color&#34;] or &#34;#0&#34;)[1:], base=16),
             is_mod=bool(int(tags[&#34;mod&#34;])),
             is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
             is_turbo=bool(int(tags[&#34;turbo&#34;])),
@@ -369,7 +423,7 @@ def deserialize_twitch_viewer(
 
     def deserialize_twitch_message(
         self,
-        message: str,
+        content: str,
         tags: dict[str, str],
         viewer: users.Viewer,
         channel: channels.Channel,
@@ -381,7 +435,33 @@ def deserialize_twitch_viewer(
             channel=channel,
             created_at=dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000),
             bits=int(tags.get(&#34;bits&#34;, 0)),
-            content=message.split(&#34;:&#34;)[-1],
+            content=content,
+        )
+
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -&gt; streams.Stream:
+        return streams.Stream(
+            app=self._app,
+            id=payload[&#34;id&#34;],
+            channel=channels.Channel(
+                app=self._app,
+                id=payload[&#34;user_id&#34;],
+                username=payload[&#34;user_login&#34;],
+                display_name=payload[&#34;user_name&#34;],
+                language=payload[&#34;language&#34;],
+                game=games.Game(
+                    id=payload[&#34;game_id&#34;],
+                    name=payload[&#34;game_name&#34;],
+                ),
+                title=payload[&#34;title&#34;],
+                delay=None,
+            ),
+            type=streams.StreamType(payload[&#34;type&#34;]),
+            viewer_count=payload[&#34;viewer_count&#34;],
+            created_at=parse_dt(payload[&#34;started_at&#34;]),
+            is_mature=payload[&#34;is_mature&#34;],
+            thumbnail_url=payload[&#34;thumbnail_url&#34;],
         )</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -418,7 +498,7 @@ def deserialize_twitch_viewer(
 </details>
 </dd>
 <dt id="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_message"><code class="name flex">
-<span>def <span class="ident">deserialize_twitch_message</span></span>(<span>self, message: str, tags: dict[str, str], viewer: users.Viewer, channel: channels.Channel) ‑> <a title="kasai.messages.Message" href="messages.html#kasai.messages.Message">Message</a></span>
+<span>def <span class="ident">deserialize_twitch_message</span></span>(<span>self, content: str, tags: dict[str, str], viewer: users.Viewer, channel: channels.Channel) ‑> <a title="kasai.messages.Message" href="messages.html#kasai.messages.Message">Message</a></span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -428,7 +508,7 @@ def deserialize_twitch_viewer(
 </summary>
 <pre><code class="python">def deserialize_twitch_message(
     self,
-    message: str,
+    content: str,
     tags: dict[str, str],
     viewer: users.Viewer,
     channel: channels.Channel,
@@ -440,7 +520,43 @@ def deserialize_twitch_viewer(
         channel=channel,
         created_at=dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000),
         bits=int(tags.get(&#34;bits&#34;, 0)),
-        content=message.split(&#34;:&#34;)[-1],
+        content=content,
+    )</code></pre>
+</details>
+</dd>
+<dt id="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_stream"><code class="name flex">
+<span>def <span class="ident">deserialize_twitch_stream</span></span>(<span>self, payload: data_binding.JSONObject) ‑> <a title="kasai.streams.Stream" href="streams.html#kasai.streams.Stream">Stream</a></span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def deserialize_twitch_stream(
+    self, payload: data_binding.JSONObject
+) -&gt; streams.Stream:
+    return streams.Stream(
+        app=self._app,
+        id=payload[&#34;id&#34;],
+        channel=channels.Channel(
+            app=self._app,
+            id=payload[&#34;user_id&#34;],
+            username=payload[&#34;user_login&#34;],
+            display_name=payload[&#34;user_name&#34;],
+            language=payload[&#34;language&#34;],
+            game=games.Game(
+                id=payload[&#34;game_id&#34;],
+                name=payload[&#34;game_name&#34;],
+            ),
+            title=payload[&#34;title&#34;],
+            delay=None,
+        ),
+        type=streams.StreamType(payload[&#34;type&#34;]),
+        viewer_count=payload[&#34;viewer_count&#34;],
+        created_at=parse_dt(payload[&#34;started_at&#34;]),
+        is_mature=payload[&#34;is_mature&#34;],
+        thumbnail_url=payload[&#34;thumbnail_url&#34;],
     )</code></pre>
 </details>
 </dd>
@@ -491,7 +607,7 @@ def deserialize_twitch_viewer(
         profile_image_url=payload[&#34;profile_image_url&#34;],
         type=users.UserType(payload[&#34;type&#34;]),
         created_at=parse_dt(payload[&#34;created_at&#34;]),
-        color=int(tags.get(&#34;color&#34;, &#34;#0&#34;)[1:], base=16),
+        color=int((tags[&#34;color&#34;] or &#34;#0&#34;)[1:], base=16),
         is_mod=bool(int(tags[&#34;mod&#34;])),
         is_subscriber=bool(int(tags[&#34;subscriber&#34;])),
         is_turbo=bool(int(tags[&#34;turbo&#34;])),
@@ -568,6 +684,7 @@ setTimeout(() => input.focus(), 100);
 <ul class="">
 <li><code><a title="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_channel" href="#kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_channel">deserialize_twitch_channel</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_message" href="#kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_message">deserialize_twitch_message</a></code></li>
+<li><code><a title="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_stream" href="#kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_stream">deserialize_twitch_stream</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_user" href="#kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_user">deserialize_twitch_user</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_viewer" href="#kasai.entity_factory.TwitchEntityFactory.deserialize_twitch_viewer">deserialize_twitch_viewer</a></code></li>
 </ul>
@@ -577,6 +694,7 @@ setTimeout(() => input.focus(), 100);
 <ul class="">
 <li><code><a title="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_channel" href="#kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_channel">deserialize_twitch_channel</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_message" href="#kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_message">deserialize_twitch_message</a></code></li>
+<li><code><a title="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_stream" href="#kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_stream">deserialize_twitch_stream</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_user" href="#kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_user">deserialize_twitch_user</a></code></li>
 <li><code><a title="kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_viewer" href="#kasai.entity_factory.TwitchEntityFactoryImpl.deserialize_twitch_viewer">deserialize_twitch_viewer</a></code></li>
 </ul>

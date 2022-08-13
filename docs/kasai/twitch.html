@@ -67,11 +67,13 @@ from hashlib import sha256
 from time import time
 
 import aiohttp
+import irctokens
 from hikari.internal import time as time_
 from hikari.internal.data_binding import JSONObject
 from hikari.internal.ux import TRACE
 
 import kasai
+from kasai.errors import NotFound
 
 _log = logging.getLogger(__name__)
 
@@ -104,6 +106,8 @@ class TwitchClient:
         &#34;_channels&#34;,
         &#34;_sock&#34;,
         &#34;_task&#34;,
+        &#34;_d&#34;,
+        &#34;_e&#34;,
     )
 
     def __init__(
@@ -122,6 +126,7 @@ class TwitchClient:
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
+        self._d = irctokens.stateful.StatefulDecoder()
 
     @property
     def is_alive(self) -&gt; bool:
@@ -242,7 +247,7 @@ class TwitchClient:
         _log.debug(&#34;starting IRC listener...&#34;)
 
         while True:
-            payload = await loop.sock_recv(self._sock, 512)
+            payload = await loop.sock_recv(self._sock, 1024)
             _log.log(
                 TRACE, f&#34;received IRC payload with size {len(payload)}\n    {payload!r}&#34;
             )
@@ -252,62 +257,59 @@ class TwitchClient:
                 await self._start_irc()
                 break
 
-            load = payload.decode(&#34;utf-8&#34;).strip()
+            lines = self._d.push(payload)
+            assert lines
 
-            for data in load.split(&#34;\n&#34;):
-                if data.startswith(&#34;@&#34;):
-                    raw_tags, message = data.split(&#34; &#34;, maxsplit=1)
-                    tags = self._transform_tags(raw_tags)
-                else:
-                    message = data
-                    tags = {}
-
-                if message.startswith(&#34;PING&#34;):
+            for line in lines:
+                if line.command == &#34;PING&#34;:
                     await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
                     _log.log(TRACE, &#34;received PING, returned PONG&#34;)
                     self.app.dispatch(kasai.PingEvent(app=self.app))
                     continue
 
-                if &#34;JOIN&#34; in message:
-                    self._channels.append(cn := message.split()[-1][1:])
+                if line.command == &#34;002&#34; and not self._me:
+                    self._me = await self.fetch_user(line.params[0])
+                    continue
+
+                if line.command == &#34;JOIN&#34;:
+                    self._channels.append(cn := line.params[0][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f&#34;joined #{cn}&#34;)
                     continue
 
-                if &#34;002&#34; in message and not self._me:
-                    self._me = await self.fetch_user(message.split()[2])
-                    continue
-
-                if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
-                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                if line.command == &#34;ROOMSTATE&#34; and line.tags and len(line.tags) &gt; 2:
+                    channel = await self.fetch_channel(line.tags[&#34;room-id&#34;])
                     self.app.dispatch(kasai.JoinRoomstateEvent(channel=channel))
                     continue
 
-                if &#34;PART&#34; in message:
-                    self._channels.remove(cn := message.split()[-1][1:])
+                if line.command == &#34;PART&#34;:
+                    self._channels.remove(cn := line.params[0][1:])
                     self.app.dispatch(kasai.PartEvent(channel=cn, app=self.app))
                     _log.info(f&#34;parted #{cn}&#34;)
                     continue
 
-                if &#34;CLEARCHAT&#34; in message:
+                if line.command == &#34;CLEARCHAT&#34;:
                     event: kasai.ClearEvent | kasai.BanEvent | kasai.TimeoutEvent
-                    keys = tags.keys()
+                    assert line.tags
 
-                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
-                    created = dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000)
+                    keys = line.tags.keys()
+                    channel = await self.fetch_channel(line.tags[&#34;room-id&#34;])
+                    created = dt.datetime.fromtimestamp(
+                        int(line.tags[&#34;tmi-sent-ts&#34;]) / 1000
+                    )
 
                     if &#34;ban-duration&#34; in keys:
                         event = kasai.TimeoutEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
-                            duration=int(tags.get(&#34;ban-duration&#34;, 0)),
+                            user=await self.fetch_user(line.tags[&#34;target-user-id&#34;]),
+                            duration=int(line.tags.get(&#34;ban-duration&#34;, 0)),
                         )
                     elif &#34;target-user-id&#34; in keys:
                         event = kasai.BanEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                            user=await self.fetch_user(line.tags[&#34;target-user-id&#34;]),
                         )
                     else:
                         event = kasai.ClearEvent(channel=channel, created_at=created)
@@ -315,15 +317,15 @@ class TwitchClient:
                     self.app.dispatch(event)
                     continue
 
-                if &#34;PRIVMSG&#34; not in message:
+                if line.command != &#34;PRIVMSG&#34;:
                     continue
 
-                user = message[(i := message.index(&#34;#&#34;) + 1) : message.index(&#34; &#34;, i)]
+                assert line.tags
                 result = self.app.entity_factory.deserialize_twitch_message(
-                    message,
-                    tags,
-                    await self._fetch_viewer(user, tags=tags),
-                    await self.fetch_channel(tags[&#34;room-id&#34;]),
+                    line.params[-1],
+                    line.tags,
+                    await self._fetch_viewer(line.tags[&#34;user-id&#34;], tags=line.tags),
+                    await self.fetch_channel(line.tags[&#34;room-id&#34;]),
                 )
                 self.app.dispatch(kasai.MessageCreateEvent(message=result))
 
@@ -438,8 +440,8 @@ class TwitchClient:
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        payload = f&#34;JOIN {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def part(self, *channels: str) -&gt; None:
         &#34;&#34;&#34;Parts (leaves) the given Twitch channels&#39; chats.
@@ -478,8 +480,8 @@ class TwitchClient:
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        payload = f&#34;PART {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def create_message(
         self, channel: str, content: str, *, reply_to: str | None = None
@@ -589,6 +591,10 @@ class TwitchClient:
 
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
         payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+
+        if not payload:
+            raise NotFound(f&#34;no user of ID or login &#39;{user}&#39; exists&#34;)
+
         return self.app.entity_factory.deserialize_twitch_user(payload[0])
 
     async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
@@ -618,12 +624,55 @@ class TwitchClient:
         payload = await self._request(
             &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
         )
+
+        if not payload:
+            raise NotFound(f&#34;no channel of &#39;{channel}&#39; exists&#34;)
+
         return self.app.entity_factory.deserialize_twitch_channel(payload[0])
 
     async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
         payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
-        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
+
+        if not payload:
+            raise NotFound(f&#34;no user by ID or login &#39;{user}&#39; exists&#34;)
+
+        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)
+
+    async def fetch_stream(self, user: str) -&gt; kasai.Stream:
+        &#34;&#34;&#34;Fetches a stream from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; stream1 = await bot.twitch.fetch_stream(&#34;twitchdev&#34;)
+        &gt;&gt;&gt; stream2 = await bot.twitch.fetch_stream(&#34;141981764&#34;)
+        &gt;&gt;&gt; stream1 == stream2
+        True
+        ```
+
+        Parameters
+        ----------
+        user : str
+            The login username or the ID of the user whose stream you
+            want to fetch. Note that while Twitch user IDs are
+            numerical, they are strings.
+
+        Returns
+        -------
+        kasai.Stream
+            The fetched stream.
+
+        .. versionadded:: 0.10a
+        &#34;&#34;&#34;
+
+        key = &#34;user_id&#34; if user.isdigit() else &#34;user_login&#34;
+        payload = await self._request(&#34;GET&#34;, &#34;streams&#34;, options={key: [user]})
+
+        if not payload:
+            raise NotFound(f&#34;no stream by a channel of ID or login &#39;{user}&#39; exists&#34;)
+
+        return self.app.entity_factory.deserialize_twitch_stream(payload[0])</code></pre>
 </details>
 </section>
 <section>
@@ -685,6 +734,8 @@ token.</dd>
         &#34;_channels&#34;,
         &#34;_sock&#34;,
         &#34;_task&#34;,
+        &#34;_d&#34;,
+        &#34;_e&#34;,
     )
 
     def __init__(
@@ -703,6 +754,7 @@ token.</dd>
         self._channels: list[str] = []
         self._sock: socket.socket | None = None
         self._task: asyncio.Task[None] | None = None
+        self._d = irctokens.stateful.StatefulDecoder()
 
     @property
     def is_alive(self) -&gt; bool:
@@ -823,7 +875,7 @@ token.</dd>
         _log.debug(&#34;starting IRC listener...&#34;)
 
         while True:
-            payload = await loop.sock_recv(self._sock, 512)
+            payload = await loop.sock_recv(self._sock, 1024)
             _log.log(
                 TRACE, f&#34;received IRC payload with size {len(payload)}\n    {payload!r}&#34;
             )
@@ -833,62 +885,59 @@ token.</dd>
                 await self._start_irc()
                 break
 
-            load = payload.decode(&#34;utf-8&#34;).strip()
+            lines = self._d.push(payload)
+            assert lines
 
-            for data in load.split(&#34;\n&#34;):
-                if data.startswith(&#34;@&#34;):
-                    raw_tags, message = data.split(&#34; &#34;, maxsplit=1)
-                    tags = self._transform_tags(raw_tags)
-                else:
-                    message = data
-                    tags = {}
-
-                if message.startswith(&#34;PING&#34;):
+            for line in lines:
+                if line.command == &#34;PING&#34;:
                     await loop.sock_sendall(self._sock, b&#34;PONG :tmi.twitch.tv\r\n&#34;)
                     _log.log(TRACE, &#34;received PING, returned PONG&#34;)
                     self.app.dispatch(kasai.PingEvent(app=self.app))
                     continue
 
-                if &#34;JOIN&#34; in message:
-                    self._channels.append(cn := message.split()[-1][1:])
+                if line.command == &#34;002&#34; and not self._me:
+                    self._me = await self.fetch_user(line.params[0])
+                    continue
+
+                if line.command == &#34;JOIN&#34;:
+                    self._channels.append(cn := line.params[0][1:])
                     self.app.dispatch(kasai.JoinEvent(channel=cn, app=self.app))
                     _log.info(f&#34;joined #{cn}&#34;)
                     continue
 
-                if &#34;002&#34; in message and not self._me:
-                    self._me = await self.fetch_user(message.split()[2])
-                    continue
-
-                if &#34;ROOMSTATE&#34; in message and len(tags) &gt; 2:
-                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
+                if line.command == &#34;ROOMSTATE&#34; and line.tags and len(line.tags) &gt; 2:
+                    channel = await self.fetch_channel(line.tags[&#34;room-id&#34;])
                     self.app.dispatch(kasai.JoinRoomstateEvent(channel=channel))
                     continue
 
-                if &#34;PART&#34; in message:
-                    self._channels.remove(cn := message.split()[-1][1:])
+                if line.command == &#34;PART&#34;:
+                    self._channels.remove(cn := line.params[0][1:])
                     self.app.dispatch(kasai.PartEvent(channel=cn, app=self.app))
                     _log.info(f&#34;parted #{cn}&#34;)
                     continue
 
-                if &#34;CLEARCHAT&#34; in message:
+                if line.command == &#34;CLEARCHAT&#34;:
                     event: kasai.ClearEvent | kasai.BanEvent | kasai.TimeoutEvent
-                    keys = tags.keys()
+                    assert line.tags
 
-                    channel = await self.fetch_channel(tags[&#34;room-id&#34;])
-                    created = dt.datetime.fromtimestamp(int(tags[&#34;tmi-sent-ts&#34;]) / 1000)
+                    keys = line.tags.keys()
+                    channel = await self.fetch_channel(line.tags[&#34;room-id&#34;])
+                    created = dt.datetime.fromtimestamp(
+                        int(line.tags[&#34;tmi-sent-ts&#34;]) / 1000
+                    )
 
                     if &#34;ban-duration&#34; in keys:
                         event = kasai.TimeoutEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
-                            duration=int(tags.get(&#34;ban-duration&#34;, 0)),
+                            user=await self.fetch_user(line.tags[&#34;target-user-id&#34;]),
+                            duration=int(line.tags.get(&#34;ban-duration&#34;, 0)),
                         )
                     elif &#34;target-user-id&#34; in keys:
                         event = kasai.BanEvent(
                             channel=channel,
                             created_at=created,
-                            user=await self.fetch_user(tags[&#34;target-user-id&#34;]),
+                            user=await self.fetch_user(line.tags[&#34;target-user-id&#34;]),
                         )
                     else:
                         event = kasai.ClearEvent(channel=channel, created_at=created)
@@ -896,15 +945,15 @@ token.</dd>
                     self.app.dispatch(event)
                     continue
 
-                if &#34;PRIVMSG&#34; not in message:
+                if line.command != &#34;PRIVMSG&#34;:
                     continue
 
-                user = message[(i := message.index(&#34;#&#34;) + 1) : message.index(&#34; &#34;, i)]
+                assert line.tags
                 result = self.app.entity_factory.deserialize_twitch_message(
-                    message,
-                    tags,
-                    await self._fetch_viewer(user, tags=tags),
-                    await self.fetch_channel(tags[&#34;room-id&#34;]),
+                    line.params[-1],
+                    line.tags,
+                    await self._fetch_viewer(line.tags[&#34;user-id&#34;], tags=line.tags),
+                    await self.fetch_channel(line.tags[&#34;room-id&#34;]),
                 )
                 self.app.dispatch(kasai.MessageCreateEvent(message=result))
 
@@ -1019,8 +1068,8 @@ token.</dd>
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        payload = f&#34;JOIN {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def part(self, *channels: str) -&gt; None:
         &#34;&#34;&#34;Parts (leaves) the given Twitch channels&#39; chats.
@@ -1059,8 +1108,8 @@ token.</dd>
             return
 
         loop = asyncio.get_running_loop()
-        msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
-        await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))
+        payload = f&#34;PART {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+        await loop.sock_sendall(self._sock, payload)
 
     async def create_message(
         self, channel: str, content: str, *, reply_to: str | None = None
@@ -1170,6 +1219,10 @@ token.</dd>
 
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
         payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+
+        if not payload:
+            raise NotFound(f&#34;no user of ID or login &#39;{user}&#39; exists&#34;)
+
         return self.app.entity_factory.deserialize_twitch_user(payload[0])
 
     async def fetch_channel(self, channel: str) -&gt; kasai.Channel:
@@ -1199,12 +1252,55 @@ token.</dd>
         payload = await self._request(
             &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
         )
+
+        if not payload:
+            raise NotFound(f&#34;no channel of &#39;{channel}&#39; exists&#34;)
+
         return self.app.entity_factory.deserialize_twitch_channel(payload[0])
 
     async def _fetch_viewer(self, user: str, *, tags: dict[str, str]) -&gt; kasai.Viewer:
         key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
         payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
-        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)</code></pre>
+
+        if not payload:
+            raise NotFound(f&#34;no user by ID or login &#39;{user}&#39; exists&#34;)
+
+        return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)
+
+    async def fetch_stream(self, user: str) -&gt; kasai.Stream:
+        &#34;&#34;&#34;Fetches a stream from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        &gt;&gt;&gt; stream1 = await bot.twitch.fetch_stream(&#34;twitchdev&#34;)
+        &gt;&gt;&gt; stream2 = await bot.twitch.fetch_stream(&#34;141981764&#34;)
+        &gt;&gt;&gt; stream1 == stream2
+        True
+        ```
+
+        Parameters
+        ----------
+        user : str
+            The login username or the ID of the user whose stream you
+            want to fetch. Note that while Twitch user IDs are
+            numerical, they are strings.
+
+        Returns
+        -------
+        kasai.Stream
+            The fetched stream.
+
+        .. versionadded:: 0.10a
+        &#34;&#34;&#34;
+
+        key = &#34;user_id&#34; if user.isdigit() else &#34;user_login&#34;
+        payload = await self._request(&#34;GET&#34;, &#34;streams&#34;, options={key: [user]})
+
+        if not payload:
+            raise NotFound(f&#34;no stream by a channel of ID or login &#39;{user}&#39; exists&#34;)
+
+        return self.app.entity_factory.deserialize_twitch_stream(payload[0])</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
@@ -1460,7 +1556,77 @@ is identical to the user ID of the channel.</dd>
     payload = await self._request(
         &#34;GET&#34;, &#34;channels&#34;, options={&#34;broadcaster_id&#34;: [channel]}
     )
+
+    if not payload:
+        raise NotFound(f&#34;no channel of &#39;{channel}&#39; exists&#34;)
+
     return self.app.entity_factory.deserialize_twitch_channel(payload[0])</code></pre>
+</details>
+</dd>
+<dt id="kasai.twitch.TwitchClient.fetch_stream"><code class="name flex">
+<span>async def <span class="ident">fetch_stream</span></span>(<span>self, user: str) ‑> <a title="kasai.streams.Stream" href="streams.html#kasai.streams.Stream">Stream</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Fetches a stream from the Twitch Helix API.</p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py">&gt;&gt;&gt; stream1 = await bot.twitch.fetch_stream(&quot;twitchdev&quot;)
+&gt;&gt;&gt; stream2 = await bot.twitch.fetch_stream(&quot;141981764&quot;)
+&gt;&gt;&gt; stream1 == stream2
+True
+</code></pre>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>user</code></strong> :&ensp;<code>str</code></dt>
+<dd>The login username or the ID of the user whose stream you
+want to fetch. Note that while Twitch user IDs are
+numerical, they are strings.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>kasai.Stream</code></dt>
+<dd>The fetched stream.</dd>
+</dl>
+<div class="admonition versionadded">
+<p class="admonition-title">Added in version:&ensp;0.10a</p>
+</div></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def fetch_stream(self, user: str) -&gt; kasai.Stream:
+    &#34;&#34;&#34;Fetches a stream from the Twitch Helix API.
+
+    Example
+    -------
+    ```py
+    &gt;&gt;&gt; stream1 = await bot.twitch.fetch_stream(&#34;twitchdev&#34;)
+    &gt;&gt;&gt; stream2 = await bot.twitch.fetch_stream(&#34;141981764&#34;)
+    &gt;&gt;&gt; stream1 == stream2
+    True
+    ```
+
+    Parameters
+    ----------
+    user : str
+        The login username or the ID of the user whose stream you
+        want to fetch. Note that while Twitch user IDs are
+        numerical, they are strings.
+
+    Returns
+    -------
+    kasai.Stream
+        The fetched stream.
+
+    .. versionadded:: 0.10a
+    &#34;&#34;&#34;
+
+    key = &#34;user_id&#34; if user.isdigit() else &#34;user_login&#34;
+    payload = await self._request(&#34;GET&#34;, &#34;streams&#34;, options={key: [user]})
+
+    if not payload:
+        raise NotFound(f&#34;no stream by a channel of ID or login &#39;{user}&#39; exists&#34;)
+
+    return self.app.entity_factory.deserialize_twitch_stream(payload[0])</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.fetch_user"><code class="name flex">
@@ -1515,6 +1681,10 @@ while Twitch user IDs are numerical, they are strings.</dd>
 
     key = &#34;id&#34; if user.isdigit() else &#34;login&#34;
     payload = await self._request(&#34;GET&#34;, &#34;users&#34;, options={key: [user]})
+
+    if not payload:
+        raise NotFound(f&#34;no user of ID or login &#39;{user}&#39; exists&#34;)
+
     return self.app.entity_factory.deserialize_twitch_user(payload[0])</code></pre>
 </details>
 </dd>
@@ -1625,8 +1795,8 @@ whatever reason.</p>
         return
 
     loop = asyncio.get_running_loop()
-    msg = &#34;\r\n&#34;.join(f&#34;JOIN #{c}&#34; for c in channels) + &#34;\r\n&#34;
-    await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+    payload = f&#34;JOIN {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+    await loop.sock_sendall(self._sock, payload)</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.part"><code class="name flex">
@@ -1697,8 +1867,8 @@ bot down — this is handled automatically.</p>
         return
 
     loop = asyncio.get_running_loop()
-    msg = &#34;\r\n&#34;.join(f&#34;PART #{c}&#34; for c in channels) + &#34;\r\n&#34;
-    await loop.sock_sendall(self._sock, msg.encode(&#34;utf-8&#34;))</code></pre>
+    payload = f&#34;PART {&#39;,&#39;.join(f&#39;#{c}&#39; for c in channels)}\r\n&#34;.encode()
+    await loop.sock_sendall(self._sock, payload)</code></pre>
 </details>
 </dd>
 <dt id="kasai.twitch.TwitchClient.start"><code class="name flex">
@@ -1804,6 +1974,7 @@ setTimeout(() => input.focus(), 100);
 <li><code><a title="kasai.twitch.TwitchClient.close" href="#kasai.twitch.TwitchClient.close">close</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.create_message" href="#kasai.twitch.TwitchClient.create_message">create_message</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.fetch_channel" href="#kasai.twitch.TwitchClient.fetch_channel">fetch_channel</a></code></li>
+<li><code><a title="kasai.twitch.TwitchClient.fetch_stream" href="#kasai.twitch.TwitchClient.fetch_stream">fetch_stream</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.fetch_user" href="#kasai.twitch.TwitchClient.fetch_user">fetch_user</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.get_me" href="#kasai.twitch.TwitchClient.get_me">get_me</a></code></li>
 <li><code><a title="kasai.twitch.TwitchClient.is_alive" href="#kasai.twitch.TwitchClient.is_alive">is_alive</a></code></li>

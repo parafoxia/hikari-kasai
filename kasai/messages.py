@@ -59,7 +59,7 @@ class Message:
     """The user who sent this message."""
 
     channel: kasai.Channel = attr.field(eq=False, hash=False, repr=True)
-    """The channel this message was sent to.."""
+    """The channel this message was sent to."""
 
     created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
     """The date and time this message was sent."""

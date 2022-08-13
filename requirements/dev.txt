@@ -3,7 +3,7 @@
 -r ./base.txt
 
 # Sessions
-nox==2022.1.7
+nox==2022.8.7
 
 # Docs
 pdoc3>=0.10
@@ -12,7 +12,7 @@ pdoc3>=0.10
 black[jupyter]~=22.6.0
 
 # Imports
-flake8~=4.0.1
+flake8~=5.0.4
 isort~=5.10.0
 
 # Typing

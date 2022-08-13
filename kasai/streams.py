@@ -100,7 +100,6 @@ class Stream:
         -------
         ```py
         >>> stream.get_thumbnail_url(1280, 720)
-        https://static-cdn.jtvnw.net/previews-ttv/live_user_twitchdev-1280x720.jpg
         ```
 
         Parameters

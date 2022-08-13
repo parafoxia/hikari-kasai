@@ -193,7 +193,7 @@ def test_deserialise_message(
     message_payload: str,
 ) -> None:
     message = entity_factory.deserialize_twitch_message(
-        message_payload,
+        message_payload.split(":")[-1],
         tags,
         viewer := entity_factory.deserialize_twitch_viewer(user_payload, tags),
         channel := entity_factory.deserialize_twitch_channel(channel_payload),
@@ -207,3 +207,53 @@ def test_deserialise_message(
     assert message.created_at == dt.datetime(2022, 2, 3, 16, 1, 24, 794000)
     assert message.bits == 0
     assert message.content == "HeyGuys <3 PartyTime"
+
+
+@pytest.fixture()
+def stream_payload() -> dict[str, t.Any]:
+    return {
+        "id": "40944942733",
+        "user_id": "67931625",
+        "user_login": "amar",
+        "user_name": "Amar",
+        "game_id": "33214",
+        "game_name": "Fortnite",
+        "type": "live",
+        "title": "27h Stream Pringles Deathrun Map + 12k MK Turnier | !sub !JustLegends !Pc !yfood",
+        "viewer_count": 14944,
+        "started_at": "2021-03-09T16:59:39Z",
+        "language": "de",
+        "thumbnail_url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_amar-{width}x{height}.jpg",
+        "tag_ids": ["9166ad14-41f1-4b04-a3b8-c8eb838c6be6"],
+        "is_mature": False,
+    }
+
+
+def test_deserialise_stream(
+    entity_factory: TwitchEntityFactoryImpl, stream_payload: dict[str, t.Any]
+) -> None:
+    stream = entity_factory.deserialize_twitch_stream(stream_payload)
+    assert isinstance(stream, kasai.Stream)
+
+    channel_payload = {
+        "broadcaster_id": "67931625",
+        "broadcaster_login": "amar",
+        "broadcaster_name": "Amar",
+        "broadcaster_language": "de",
+        "game_id": "33214",
+        "game_name": "Fortnite",
+        "title": "27h Stream Pringles Deathrun Map + 12k MK Turnier | !sub !JustLegends !Pc !yfood",
+        "delay": None,
+    }
+
+    assert isinstance(stream.app, kasai.GatewayBot)
+    assert stream.id == "40944942733"
+    assert stream.channel == entity_factory.deserialize_twitch_channel(channel_payload)
+    assert stream.type == kasai.StreamType.LIVE
+    assert stream.viewer_count == 14944
+    assert stream.created_at == dt.datetime(2021, 3, 9, 16, 59, 39, tzinfo=tzutc())
+    assert not stream.is_mature
+    assert (
+        stream.thumbnail_url
+        == "https://static-cdn.jtvnw.net/previews-ttv/live_user_amar-{width}x{height}.jpg"
+    )

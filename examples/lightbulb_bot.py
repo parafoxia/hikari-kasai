@@ -42,7 +42,7 @@ async def on_started(_: hikari.StartedEvent) -> None:
     """Join our Twitch channel once the bot starts. We'll use the
     Twitch Developers channel for this example."""
 
-    await bot.twitch.join("parafoxia")
+    await bot.twitch.join("twitchdev")
 
 
 @bot.command()
@@ -53,7 +53,7 @@ async def cmd_send(ctx: lightbulb.SlashContext) -> None:
     """A simple slash command which sends a message to a Twitch
     channel."""
 
-    await bot.twitch.create_message("parafoxia", ctx.options.text)
+    await bot.twitch.create_message("twitchdev", ctx.options.text)
 
 
 @bot.listen()

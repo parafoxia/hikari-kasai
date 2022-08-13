@@ -265,7 +265,9 @@ class TwitchClient:
 
                     keys = line.tags.keys()
                     channel = await self.fetch_channel(line.tags["room-id"])
-                    created = dt.datetime.fromtimestamp(int(line.tags["tmi-sent-ts"]) / 1000)
+                    created = dt.datetime.fromtimestamp(
+                        int(line.tags["tmi-sent-ts"]) / 1000
+                    )
 
                     if "ban-duration" in keys:
                         event = kasai.TimeoutEvent(
@@ -595,3 +597,32 @@ class TwitchClient:
         key = "id" if user.isdigit() else "login"
         payload = await self._request("GET", "users", options={key: [user]})
         return self.app.entity_factory.deserialize_twitch_viewer(payload[0], tags)
+
+    async def fetch_stream(self, user: str) -> kasai.Stream:
+        """Fetches a stream from the Twitch Helix API.
+
+        Example
+        -------
+        ```py
+        >>> stream1 = await bot.twitch.fetch_stream("twitchdev")
+        >>> stream2 = await bot.twitch.fetch_stream("141981764")
+        >>> stream1 == stream2
+        True
+        ```
+
+        Parameters
+        ----------
+        user : str
+            The login username or the ID of the user whose stream you
+            want to fetch. Note that while Twitch user IDs are
+            numerical, they are strings.
+
+        Returns
+        -------
+        kasai.Stream
+            The fetched stream.
+        """
+
+        key = "user_id" if user.isdigit() else "user_login"
+        payload = await self._request("GET", "streams", options={key: [user]})
+        return self.app.entity_factory.deserialize_twitch_stream(payload[0])

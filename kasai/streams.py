@@ -28,23 +28,33 @@
 
 from __future__ import annotations
 
-__all__ = ("Channel",)
+__all__ = ("Stream", "StreamType")
 
-import typing as t
+import datetime as dt
+import enum
 
 import attr
+from dateutil.tz import tzutc
 from hikari.internal import attr_extensions
 
+import kasai
 from kasai import traits
 
-if t.TYPE_CHECKING:
-    import kasai
+
+class StreamType(enum.Enum):
+    """An enum representing a stream type."""
+
+    LIVE = "live"
+    """Represents a live stream. This should also be the case."""
+
+    UNKNOWN = ""
+    """Only occurs when an error occurs."""
 
 
 @attr_extensions.with_copy
 @attr.define(hash=True, kw_only=True, weakref_slot=False)
-class Channel:
-    """A class representing a Twitch channel."""
+class Stream:
+    """A class representing a Twitch stream."""
 
     app: traits.TwitchAware = attr.field(
         repr=False,
@@ -55,75 +65,55 @@ class Channel:
     """The base client application."""
 
     id: str = attr.field(hash=True, repr=True)
-    """This channel's ID."""
+    """This stream's ID."""
 
-    username: str = attr.field(eq=False, hash=False, repr=False)
-    """This channel's login username."""
+    channel: kasai.Channel = attr.field(eq=False, hash=False, repr=True)
+    """The channel this stream is being broadcast to."""
 
-    display_name: str = attr.field(eq=False, hash=False, repr=True)
-    """The name this channel is displayed as on Twitch. This will always
-    be the username with casing variations."""
+    type: StreamType = attr.field(eq=False, hash=False, repr=False)
+    """The stream type. This should always be `StreamType.LIVE` though
+    can be `StreamType.UNKNOWN` in the case of an error."""
 
-    language: str = attr.field(eq=False, hash=False, repr=False)
-    """The language this channel is streaming using (according to their
-    settings)."""
+    viewer_count: int = attr.field(eq=False, hash=False, repr=True)
+    """The number of viewers watching this stream at the time the
+    request was made."""
 
-    game: kasai.Game = attr.field(eq=False, hash=False, repr=True)
-    """The game this channel is playing."""
+    created_at: dt.datetime = attr.field(eq=False, hash=False, repr=True)
+    """The date and time this stream started."""
 
-    title: str = attr.field(eq=False, hash=False, repr=True)
-    """The title of this channel's stream."""
+    is_mature: bool = attr.field(eq=False, hash=False, repr=True)
+    """Whether this stream is marked as mature (18+)."""
 
-    delay: int | None = attr.field(eq=False, hash=False, repr=False)
-    """The number of seconds this channel's stream is delayed by. This
-    is `None` if unknown.
-
-    .. versionchanged:: 0.10a
-        This can now be `None`.
-    """
+    thumbnail_url: str = attr.field(eq=False, hash=False, repr=False)
+    """The raw thumbnail URL."""
 
     @property
-    def irc_format(self) -> str:
-        """This channel's username in the format IRC expects it."""
+    def uptime(self) -> dt.timedelta:
+        """The amount of time the stream has been live."""
 
-        return f"#{self.username}"
+        return dt.datetime.now(tz=tzutc()) - self.created_at
 
-    async def send(self, content: str) -> None:
-        """Send a message to this channel.
+    def get_thumbnail_url(self, width: int, height: int) -> str:
+        """Get the thumbnail URL for a specific width and height.
 
         Example
         -------
         ```py
-        >>> await channel.send("Never gonna give you up!")
+        >>> stream.get_thumbnail_url(1280, 720)
+        https://static-cdn.jtvnw.net/previews-ttv/live_user_twitchdev-1280x720.jpg
         ```
 
         Parameters
         ----------
-        content : str
-            The text content of the message you want to send.
+        width : int
+            The thumbnail width, in pixels.
+        height : int
+            The thumbnail height, in pixels.
 
         Returns
         -------
-        None
+        str
+            The formatted thumbnail URL.
         """
 
-        await self.app.twitch.create_message(self.username, content)
-
-    async def fetch_stream(self) -> kasai.Stream:
-        """Fetches a stream from the Twitch Helix API.
-
-        Example
-        -------
-        ```py
-        >>> stream = await channel.fetch_stream()
-        >>> stream.is_mature
-        False
-        ```
-
-        Returns
-        -------
-        kasai.Stream
-            The fetched stream.
-        """
-
-        return await self.app.twitch.fetch_stream(self.id)
+        return self.thumbnail_url.format(width=width, height=height)

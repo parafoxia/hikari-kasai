@@ -39,7 +39,7 @@ from hikari.api import EntityFactory
 from hikari.impl import EntityFactoryImpl
 from hikari.internal import data_binding
 
-from kasai import channels, games, messages, traits, users
+from kasai import channels, games, messages, streams, traits, users
 
 
 class TwitchEntityFactory(EntityFactory, abc.ABC):
@@ -69,6 +69,12 @@ class TwitchEntityFactory(EntityFactory, abc.ABC):
         viewer: users.Viewer,
         channel: channels.Channel,
     ) -> messages.Message:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -> streams.Stream:
         raise NotImplementedError
 
 
@@ -143,4 +149,30 @@ class TwitchEntityFactoryImpl(EntityFactoryImpl, TwitchEntityFactory):
             created_at=dt.datetime.fromtimestamp(int(tags["tmi-sent-ts"]) / 1000),
             bits=int(tags.get("bits", 0)),
             content=content,
+        )
+
+    def deserialize_twitch_stream(
+        self, payload: data_binding.JSONObject
+    ) -> streams.Stream:
+        return streams.Stream(
+            app=self._app,
+            id=payload["id"],
+            channel=channels.Channel(
+                app=self._app,
+                id=payload["user_id"],
+                username=payload["user_login"],
+                display_name=payload["user_name"],
+                language=payload["language"],
+                game=games.Game(
+                    id=payload["game_id"],
+                    name=payload["game_name"],
+                ),
+                title=payload["title"],
+                delay=None,
+            ),
+            type=streams.StreamType(payload["type"]),
+            viewer_count=payload["viewer_count"],
+            created_at=parse_dt(payload["started_at"]),
+            is_mature=payload["is_mature"],
+            thumbnail_url=payload["thumbnail_url"],
         )

@@ -60,6 +60,7 @@ from kasai.errors import *
 from kasai.events import *
 from kasai.games import *
 from kasai.messages import *
+from kasai.streams import *
 from kasai.traits import *
 from kasai.twitch import *
 from kasai.users import *

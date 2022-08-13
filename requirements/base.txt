@@ -1,3 +1,3 @@
-hikari==2.0.0.dev109
+hikari~=2.0.0.dev110
 irctokens>=2.0,<3
 python-dateutil>=2.8.2,<3

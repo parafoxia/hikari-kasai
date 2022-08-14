@@ -33,7 +33,6 @@ __all__ = ("TwitchClient",)
 import asyncio
 import datetime as dt
 import logging
-import socket
 import typing as t
 from hashlib import sha256
 from time import time
@@ -76,10 +75,10 @@ class TwitchClient:
         "_irc_token",
         "_nickname",
         "_channels",
-        "_sock",
+        "_reader",
+        "_writer",
         "_task",
         "_d",
-        "_e",
     )
 
     def __init__(
@@ -96,7 +95,8 @@ class TwitchClient:
         self._irc_token = irc_token
         self._nickname = sha256(f"{time()}".encode("utf-8")).hexdigest()[:7]
         self._channels: list[str] = []
-        self._sock: socket.socket | None = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self._task: asyncio.Task[None] | None = None
         self._d = irctokens.stateful.StatefulDecoder()
 
@@ -214,12 +214,12 @@ class TwitchClient:
         return t.cast(list[JSONObject], res["data"])
 
     async def _listen(self) -> None:
-        assert self._sock
-        loop = asyncio.get_running_loop()
+        assert self._reader
+        assert self._writer
         _log.debug("starting IRC listener...")
 
         while True:
-            payload = await loop.sock_recv(self._sock, 1024)
+            payload = await self._reader.read(1_024)
             _log.log(
                 TRACE, f"received IRC payload with size {len(payload)}\n    {payload!r}"
             )
@@ -234,7 +234,8 @@ class TwitchClient:
 
             for line in lines:
                 if line.command == "PING":
-                    await loop.sock_sendall(self._sock, b"PONG :tmi.twitch.tv\r\n")
+                    self._writer.write(b"PONG :tmi.twitch.tv\r\n")
+                    await self._writer.drain()
                     _log.log(TRACE, "received PING, returned PONG")
                     self.app.dispatch(kasai.PingEvent(app=self.app))
                     continue
@@ -312,19 +313,17 @@ class TwitchClient:
         _log.info("api.twitch.tv/helix is ready")
 
     async def _start_irc(self) -> None:
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.setblocking(False)
-
-        loop = asyncio.get_running_loop()
-        await loop.sock_connect(self._sock, ("irc.chat.twitch.tv", 6667))
-        _log.debug(f"connected to {self._sock.getpeername()}")
-        await loop.sock_sendall(
-            self._sock,
+        self._reader, self._writer = await asyncio.open_connection(
+            "irc.chat.twitch.tv", 6667
+        )
+        _log.debug(f"connected to {self._writer.get_extra_info('peername')}")
+        self._writer.write(
             (
                 f"PASS {self._irc_token}\r\nNICK {self._nickname}\r\n"
                 "CAP REQ :twitch.tv/commands twitch.tv/tags\r\n"
             ).encode(),
         )
+        await self._writer.drain()
 
         def end_task(task: asyncio.Task[None]) -> None:
             try:
@@ -332,6 +331,7 @@ class TwitchClient:
             except asyncio.CancelledError:
                 ...
 
+        loop = asyncio.get_running_loop()
         self._task = loop.create_task(self._listen())
         self._task.add_done_callback(end_task)
         _log.info("irc.chat.twitch.tv is ready")
@@ -367,12 +367,12 @@ class TwitchClient:
             )
 
         assert self._session
-        assert self._sock
+        assert self._writer
 
         await self.part(*self._channels)
         await self._session.close()
-        self._sock.close()
-        self._sock = None
+        self._writer.close()
+        await self._writer.wait_closed()
 
         if self._task and not self._task.cancelled():
             self._task.cancel()
@@ -405,15 +405,15 @@ class TwitchClient:
         None
         """
 
-        if self._sock is None:
+        if self._writer is None:
             raise kasai.NotAlive("there are no alive IRC websockets")
 
         if not channels:
             return
 
-        loop = asyncio.get_running_loop()
         payload = f"JOIN {','.join(f'#{c}' for c in channels)}\r\n".encode()
-        await loop.sock_sendall(self._sock, payload)
+        self._writer.write(payload)
+        await self._writer.drain()
 
     async def part(self, *channels: str) -> None:
         """Parts (leaves) the given Twitch channels' chats.
@@ -445,15 +445,15 @@ class TwitchClient:
         None
         """
 
-        if self._sock is None:
+        if self._writer is None:
             raise kasai.NotAlive("there are no alive IRC websockets")
 
         if not channels:
             return
 
-        loop = asyncio.get_running_loop()
         payload = f"PART {','.join(f'#{c}' for c in channels)}\r\n".encode()
-        await loop.sock_sendall(self._sock, payload)
+        self._writer.write(payload)
+        await self._writer.drain()
 
     async def create_message(
         self, channel: str, content: str, *, reply_to: str | None = None
@@ -499,7 +499,7 @@ class TwitchClient:
         None
         """
 
-        if self._sock is None:
+        if self._writer is None:
             raise kasai.NotAlive("there are no alive IRC websockets")
 
         channel = channel.strip("#")
@@ -510,9 +510,9 @@ class TwitchClient:
         tag = f"@reply-parent-msg-id={reply_to} " if reply_to else ""
         payload = f"{tag}PRIVMSG #{channel} :{content}\r\n".encode("utf-8")
 
-        loop = asyncio.get_running_loop()
         _log.log(TRACE, f"sending payload with size {len(payload)}\n    {payload!r}")
-        await loop.sock_sendall(self._sock, payload)
+        self._writer.write(payload)
+        await self._writer.drain()
 
     def get_me(self) -> kasai.User | None:
         """Return the bot user, if known. This should be available

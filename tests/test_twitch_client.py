@@ -31,6 +31,7 @@ from __future__ import annotations
 import re
 
 import pytest
+from irctokens.stateful import StatefulDecoder
 
 import kasai
 
@@ -51,8 +52,10 @@ def test_initial_attributes(client: kasai.TwitchClient) -> None:
     assert client._session is None
     assert _NICK_PATTERN.match(client._nickname)
     assert client._channels == []
-    assert client._sock is None
+    assert client._reader is None
+    assert client._writer is None
     assert client._task is None
+    assert isinstance(client._d, StatefulDecoder)
 
 
 def test_initial_is_alive_property(client: kasai.TwitchClient) -> None:
